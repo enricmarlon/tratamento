@@ -8,7 +8,10 @@ type ContactSheet = {
   headers: string[];
   rows: string[][];
   sourcePhones: string[];
+  sourceNames: string[];
+  reviewReasons: string[][];
   phoneIndex: number;
+  nameIndex: number;
   fileName: string;
 };
 
@@ -70,6 +73,57 @@ function cleanPhone(phone: string) {
   return `55${digits}`;
 }
 
+const lowercaseNameParticles = new Set(["da", "das", "de", "do", "dos", "e"]);
+const nameAbbreviations = new Set(["jr", "sc", "mr", "dr", "sr", "sra", "eng", "arq", "prof", "profa"]);
+const joinedNamePrefixes = ["maria", "jose", "ana", "joao", "luiz", "luis", "pedro", "paulo", "antonio", "francisco"];
+const joinedNameSuffixes = new Set([
+  "julia", "juliana", "eduarda", "clara", "luiza", "helena", "beatriz", "isabel", "gabriela", "laura",
+  "neto", "neta", "filho", "filha", "miguel", "gabriel", "lucas", "rafael", "vitoria", "manuel", "maria",
+  "joao", "pedro", "paulo", "antonio", "augusto", "felipe", "henrique", "mariana", "sofia", "luana", "lara",
+]);
+const professionAndBusinessTerms = new Set([
+  "engenheiro", "engenheira", "engenharia", "eng", "psicologo", "psicologa", "psicologia", "pisco",
+  "arq", "arquiteta", "arquitetura", "arquiteto", "loja", "studio", "estudio", "medico", "medica",
+  "medicina", "dentista", "odontologia", "advogado", "advogada", "advocacia", "contador", "contadora",
+  "contabilidade", "corretor", "corretora", "imobiliaria", "consultoria", "consultor", "consultora", "clinica",
+  "farmacia", "restaurante", "comercio", "comercial", "empresa", "oficina", "construtora", "mercado", "servicos",
+  "salon", "salao", "barbearia", "pizzaria", "academia", "escritorio", "arquiteto", "arquiteta",
+]);
+
+function normalizeNameCase(name: string) {
+  const lowercase = name.trim().toLocaleLowerCase("pt-BR");
+  return lowercase.replace(/(^|[\s'-])(\p{L})(\p{L}*)/gu, (match, separator: string, initial: string, rest: string, offset: number) => {
+    const word = `${initial}${rest}`;
+    if (offset > 0 && lowercaseNameParticles.has(word)) return `${separator}${word}`;
+    return `${separator}${initial.toLocaleUpperCase("pt-BR")}${rest}`;
+  });
+}
+
+function nameReviewReasons(name: string) {
+  const reasons: string[] = [];
+  const normalized = cleanHeader(name);
+  const words = normalized.match(/[a-z0-9]+/g) ?? [];
+  const decomposedName = name.normalize("NFD").toLocaleLowerCase("pt-BR");
+
+  if (words.some((word) => nameAbbreviations.has(word))) reasons.push("Possível abreviação");
+  if (/[^\p{L}\p{M}\s'-]/u.test(name)) reasons.push("Caractere fora do padrão");
+  if (/(^|[^\p{L}])\p{M}/u.test(decomposedName) || /(^|[^aeiou])\u0301/u.test(decomposedName) || /(?:Ã|Â)[^\u0000-\u007f]|�/u.test(name)) {
+    reasons.push("Possível problema de acentuação/arquivo");
+  }
+
+  const joined = normalized.replace(/[^a-z]/g, "");
+  if (!/[\s'-]/u.test(name) && joinedNamePrefixes.some((prefix) =>
+    joined.startsWith(prefix) && joinedNameSuffixes.has(joined.slice(prefix.length)),
+  )) {
+    reasons.push("Possível nome composto sem espaço");
+  }
+  if (words.some((word) => professionAndBusinessTerms.has(word))) {
+    reasons.push("Possível profissão ou negócio");
+  }
+
+  return reasons;
+}
+
 export default function HomePanel() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [sheet, setSheet] = useState<ContactSheet | null>(null);
@@ -102,6 +156,7 @@ export default function HomePanel() {
       }
 
       const phoneIndex = normalized.indexOf("telefone");
+      const nameIndex = normalized.indexOf("nome");
       const sourceRows = parsed.slice(1).filter((row) => row.some((cell) => cell.trim()));
       if (!sourceRows.length) {
         setSheet(null);
@@ -109,13 +164,31 @@ export default function HomePanel() {
         return;
       }
 
-      const sourcePhones = sourceRows.map((row) => row[phoneIndex] ?? "");
-      const rows = sourceRows.map((source) => {
+      const records = sourceRows.map((source, sourceIndex) => {
         const row = headers.map((_, index) => source[index] ?? "");
+        const sourceName = row[nameIndex];
+        const reasons = nameReviewReasons(sourceName);
+        row[nameIndex] = normalizeNameCase(sourceName);
         row[phoneIndex] = cleanPhone(row[phoneIndex]);
-        return row;
+        return {
+          row,
+          sourceName,
+          sourcePhone: source[phoneIndex] ?? "",
+          reasons,
+          sourceIndex,
+        };
       });
-      setSheet({ headers, rows, sourcePhones, phoneIndex, fileName: file.name });
+      records.sort((first, second) => Number(second.reasons.length > 0) - Number(first.reasons.length > 0) || first.sourceIndex - second.sourceIndex);
+      setSheet({
+        headers,
+        rows: records.map((record) => record.row),
+        sourceNames: records.map((record) => record.sourceName),
+        sourcePhones: records.map((record) => record.sourcePhone),
+        reviewReasons: records.map((record) => record.reasons),
+        phoneIndex,
+        nameIndex,
+        fileName: file.name,
+      });
     } catch {
       setSheet(null);
       setError("Não foi possível ler esse arquivo. Confira se ele está em formato CSV.");
@@ -150,8 +223,9 @@ export default function HomePanel() {
     if (inputRef.current) inputRef.current.value = "";
   }
 
-  const identifiedPhones = sheet?.sourcePhones.filter((phone) => phone.replace(/\D/g, "")).length ?? 0;
   const changedPhones = sheet?.sourcePhones.filter((phone) => cleanPhone(phone) !== phone).length ?? 0;
+  const adjustedNames = sheet?.sourceNames.filter((name, index) => name !== sheet.rows[index][sheet.nameIndex]).length ?? 0;
+  const namesToReview = sheet?.reviewReasons.filter((reasons) => reasons.length > 0).length ?? 0;
 
   return (
     <div className="app-shell">
@@ -166,7 +240,7 @@ export default function HomePanel() {
         <header className="topbar"><span className="breadcrumb">Ferramentas <span>/</span> Tratar contatos</span><span className="local-badge"><span /> Processamento local</span></header>
         <div className="content-wrap">
           <section className="page-heading">
-            <div><div className="eyebrow">ORGANIZE SUA BASE</div><h1>Contatos prontos<br className="mobile-break" /> para conversar.</h1><p>Padronize os telefones da sua planilha e exporte tudo em Excel.</p></div>
+            <div><div className="eyebrow">ORGANIZE SUA BASE</div><h1>Contatos prontos<br className="mobile-break" /> para conversar.</h1><p>Padronize nomes e telefones, confira os cadastros sinalizados e exporte em Excel.</p></div>
             <div className="format-note"><span>CSV</span><ArrowRight size={15} /><span className="format-xlsx">XLSX</span></div>
           </section>
 
@@ -190,13 +264,17 @@ export default function HomePanel() {
               <div className="section-topline"><div className="step-label"><span>02</span><h2>Confira o resultado</h2></div><span className="ready-label"><Check size={14} /> Pronto para exportar</span></div>
               <div className="stats-row">
                 <div className="stat-block"><span className="stat-label">CONTATOS NA PLANILHA</span><strong>{sheet.rows.length.toLocaleString("pt-BR")}</strong></div>
-                <div className="stat-block"><span className="stat-label">TELEFONES IDENTIFICADOS</span><strong>{identifiedPhones.toLocaleString("pt-BR")}</strong></div>
-                <div className="stat-block stat-highlight"><span className="stat-label">NÚMEROS ATUALIZADOS</span><strong>{changedPhones.toLocaleString("pt-BR")}</strong></div>
+                <div className="stat-block"><span className="stat-label">NOMES AJUSTADOS</span><strong>{adjustedNames.toLocaleString("pt-BR")}</strong></div>
+                <div className="stat-block stat-highlight"><span className="stat-label">NOMES PARA REVISAR</span><strong>{namesToReview.toLocaleString("pt-BR")}</strong></div>
+                <div className="stat-block"><span className="stat-label">TELEFONES ATUALIZADOS</span><strong>{changedPhones.toLocaleString("pt-BR")}</strong></div>
               </div>
-              <div className="table-frame"><div className="table-scroll"><table><thead><tr>{sheet.headers.map((header, index) => <th key={`${header}-${index}`}>{header}</th>)}</tr></thead><tbody>
-                {sheet.rows.slice(0, 6).map((row, rowIndex) => <tr key={`${rowIndex}-${row[0]}`}>{row.map((cell, cellIndex) => <td className={cellIndex === sheet.phoneIndex ? "phone-cell" : ""} key={`${rowIndex}-${cellIndex}`}>
-                  {cellIndex === sheet.phoneIndex && sheet.sourcePhones[rowIndex] !== cell ? <span className="phone-change"><span className="old-phone">{sheet.sourcePhones[rowIndex] || "vazio"}</span><ArrowRight size={13} /><span>{cell || "vazio"}</span></span> : cell || <span className="empty-cell">—</span>}
-                </td>)}</tr>)}
+              <div className="table-frame"><div className="table-scroll"><table><thead><tr><th>triagem</th>{sheet.headers.map((header, index) => <th key={`${header}-${index}`}>{header}</th>)}</tr></thead><tbody>
+                {sheet.rows.slice(0, 6).map((row, rowIndex) => <tr className={sheet.reviewReasons[rowIndex].length ? "review-row" : ""} key={`${rowIndex}-${row[0]}`}>
+                  <td>{sheet.reviewReasons[rowIndex].length ? <><span className="review-flag">Revisar</span><span className="review-detail">{sheet.reviewReasons[rowIndex].join(" · ")}</span></> : <span className="review-clear">OK</span>}</td>
+                  {row.map((cell, cellIndex) => <td className={cellIndex === sheet.phoneIndex ? "phone-cell" : ""} key={`${rowIndex}-${cellIndex}`}>
+                    {cellIndex === sheet.nameIndex && sheet.sourceNames[rowIndex] !== cell ? <span className="phone-change"><span className="old-phone">{sheet.sourceNames[rowIndex] || "vazio"}</span><ArrowRight size={13} /><span>{cell || "vazio"}</span></span> : cellIndex === sheet.phoneIndex && sheet.sourcePhones[rowIndex] !== cell ? <span className="phone-change"><span className="old-phone">{sheet.sourcePhones[rowIndex] || "vazio"}</span><ArrowRight size={13} /><span>{cell || "vazio"}</span></span> : cell || <span className="empty-cell">—</span>}
+                  </td>)}
+                </tr>)}
               </tbody></table></div>{sheet.rows.length > 6 && <div className="table-footer">Exibindo 6 de {sheet.rows.length.toLocaleString("pt-BR")} contatos</div>}</div>
             </section>
             <section className="export-bar"><div className="export-copy"><span className="export-icon"><FileSpreadsheet size={19} /></span><div><strong>Planilha tratada</strong><span>Arquivo Excel · .xlsx</span></div></div><button className="download-button" onClick={() => void downloadExcel()} type="button"><ArrowDownToLine size={17} /> Baixar Excel</button></section>
