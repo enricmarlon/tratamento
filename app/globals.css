@@ -287,6 +287,21 @@ a:focus-visible,
 .course-cancel { min-height: 38px; border: 1px solid #3a4a3e; border-radius: 5px; background: transparent; padding: 0 13px; color: #bfcbc1; font-size: 11px; }
 .course-cancel:hover { background: #223027; }
 .download-button:disabled { cursor: not-allowed; opacity: .45; transform: none; }
+.optional-label { margin-left: 6px; color: #91a096; font-size: 9px; font-weight: 600; }
+.blacklist-upload { position: relative; display: grid; min-height: 76px; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 12px; border: 1px dashed #49614f; border-radius: 6px; background: #17211a; padding: 12px 15px; cursor: pointer; transition: border-color 150ms ease, background 150ms ease; }
+.blacklist-upload:hover, .blacklist-upload:focus-within { border-color: #83c695; background: #1c2c21; }
+.blacklist-upload.is-reading { opacity: .7; pointer-events: none; }
+.blacklist-upload input, .blacklist-hidden-input { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; }
+.blacklist-icon { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 6px; background: #23392a; color: #91dda7; }
+.blacklist-copy, .blacklist-file-info { display: flex; min-width: 0; flex-direction: column; gap: 5px; }
+.blacklist-copy strong, .blacklist-file-info strong { overflow: hidden; color: #dce7de; font-size: 12px; font-weight: 620; text-overflow: ellipsis; white-space: nowrap; }
+.blacklist-copy span, .blacklist-file-info span { color: #a1b0a5; font-size: 10px; line-height: 1.4; }
+.blacklist-action { border: 1px solid #49614f; border-radius: 5px; background: #202d23; padding: 8px 10px; color: #c0d5c4; font-size: 10px; font-weight: 600; }
+.blacklist-loaded { display: flex; min-height: 70px; align-items: center; gap: 12px; border: 1px solid #344b39; border-radius: 6px; background: #19251d; padding: 10px 14px; }
+.blacklist-file-info { flex: 1; }
+.blacklist-replace { flex: 0 0 auto; color: #a0e4b2; font-size: 11px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.suppression-summary { display: flex; align-items: center; gap: 8px; margin: 12px 0 0; border-left: 2px solid #83d29b; background: #1b2a20; padding: 10px 12px; color: #c0d5c4; font-size: 11px; }
+.suppression-summary svg { flex: 0 0 auto; color: #91dda7; }
 
 @media (max-width: 680px) {
   .export-actions { width: 100%; flex-direction: column; }
@@ -297,6 +312,11 @@ a:focus-visible,
   .course-dialog-heading h2 { font-size: 17px; }
   .course-dialog-actions { align-items: stretch; flex-direction: column-reverse; }
   .course-dialog-actions button { width: 100%; min-height: 41px; }
+  .blacklist-upload { grid-template-columns: 36px minmax(0, 1fr); padding: 12px; }
+  .blacklist-action { grid-column: 2; justify-self: start; }
+  .blacklist-loaded { align-items: flex-start; flex-wrap: wrap; }
+  .blacklist-file-info { width: calc(100% - 50px); flex: 1 1 calc(100% - 50px); }
+  .blacklist-replace { margin-left: 48px; }
   .login-panel { padding: 28px 22px; }
   .login-brand { margin-bottom: 34px; }
 }

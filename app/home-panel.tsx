@@ -1,19 +1,32 @@
 "use client";
 
 import ExcelJS from "exceljs";
-import { ArrowDownToLine, ArrowRight, Check, FileSpreadsheet, LockKeyhole, LogOut, RotateCcw, Upload, X } from "lucide-react";
+import { ArrowDownToLine, ArrowRight, Check, FileSpreadsheet, FileText, LockKeyhole, LogOut, RotateCcw, Upload, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { signOut } from "./actions/auth";
+import { cleanPhone, parseSuppressionList } from "../lib/phone-normalization";
 
-type ContactSheet = {
+type ContactRecord = {
+  row: string[];
+  sourcePhones: string;
+  sourceNames: string;
+  reviewReasons: string[];
+};
+
+type ContactSheetBase = {
   headers: string[];
+  allRecords: ContactRecord[];
+  phoneIndex: number;
+  nameIndex: number;
+  fileName: string;
+};
+
+type ContactSheet = ContactSheetBase & {
   rows: string[][];
   sourcePhones: string[];
   sourceNames: string[];
   reviewReasons: string[][];
-  phoneIndex: number;
-  nameIndex: number;
-  fileName: string;
+  removedCount: number;
 };
 
 type CourseMessagePart = {
@@ -90,11 +103,18 @@ function cleanHeader(header: string) {
   return header.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
 
-function cleanPhone(phone: string) {
-  const digits = phone.replace(/\D/g, "");
-  if (!digits) return "";
-  if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) return digits;
-  return `55${digits}`;
+function applySuppressionList(sheet: ContactSheetBase, suppressedPhones: string[]): ContactSheet {
+  const suppressed = new Set(suppressedPhones);
+  const remaining = sheet.allRecords.filter((record) => !suppressed.has(record.row[sheet.phoneIndex]));
+
+  return {
+    ...sheet,
+    rows: remaining.map((record) => record.row),
+    sourcePhones: remaining.map((record) => record.sourcePhones),
+    sourceNames: remaining.map((record) => record.sourceNames),
+    reviewReasons: remaining.map((record) => record.reviewReasons),
+    removedCount: sheet.allRecords.length - remaining.length,
+  };
 }
 
 const lowercaseNameParticles = new Set(["da", "das", "de", "do", "dos", "e"]);
@@ -150,11 +170,52 @@ function nameReviewReasons(name: string) {
 
 export default function HomePanel({ userEmail }: { userEmail: string }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const suppressionInputRef = useRef<HTMLInputElement>(null);
   const courseDialogRef = useRef<HTMLDialogElement>(null);
   const [sheet, setSheet] = useState<ContactSheet | null>(null);
+  const [suppressionList, setSuppressionList] = useState<{ fileName: string; phones: string[] } | null>(null);
+  const [suppressionError, setSuppressionError] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [suppressionLoading, setSuppressionLoading] = useState(false);
   const [courseMessage, setCourseMessage] = useState("");
+
+  async function importSuppressionList(file?: File) {
+    if (!file) return;
+    setSuppressionError("");
+    if (!file.name.toLowerCase().endsWith(".txt")) {
+      setSuppressionError("Selecione um arquivo TXT para a lista de exclusão.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setSuppressionError("O arquivo TXT excede o limite de 10 MB.");
+      return;
+    }
+
+    setSuppressionLoading(true);
+    try {
+      const phones = parseSuppressionList(await file.text());
+      if (!phones.length) {
+        setSuppressionError("Não encontrei telefones válidos nesse arquivo TXT.");
+        return;
+      }
+
+      setSuppressionList({ fileName: file.name, phones });
+      setSheet((current) => current ? applySuppressionList(current, phones) : current);
+    } catch {
+      setSuppressionError("Não foi possível ler esse arquivo TXT.");
+    } finally {
+      setSuppressionLoading(false);
+      if (suppressionInputRef.current) suppressionInputRef.current.value = "";
+    }
+  }
+
+  function clearSuppressionList() {
+    setSuppressionList(null);
+    setSuppressionError("");
+    setSheet((current) => current ? applySuppressionList(current, []) : current);
+    if (suppressionInputRef.current) suppressionInputRef.current.value = "";
+  }
 
   async function importCsv(file?: File) {
     if (!file) return;
@@ -205,16 +266,19 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
         };
       });
       records.sort((first, second) => Number(second.reasons.length > 0) - Number(first.reasons.length > 0) || first.sourceIndex - second.sourceIndex);
-      setSheet({
+      const allRecords = records.map((record) => ({
+        row: record.row,
+        sourcePhones: record.sourcePhone,
+        sourceNames: record.sourceName,
+        reviewReasons: record.reasons,
+      }));
+      setSheet(applySuppressionList({
         headers,
-        rows: records.map((record) => record.row),
-        sourceNames: records.map((record) => record.sourceName),
-        sourcePhones: records.map((record) => record.sourcePhone),
-        reviewReasons: records.map((record) => record.reasons),
+        allRecords,
         phoneIndex,
         nameIndex,
         fileName: file.name,
-      });
+      }, suppressionList?.phones ?? []));
     } catch {
       setSheet(null);
       setError("Não foi possível ler esse arquivo. Confira se ele está em formato CSV.");
@@ -306,8 +370,22 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
             <div className="format-note"><span>CSV</span><ArrowRight size={15} /><span className="format-xlsx">XLSX</span></div>
           </section>
 
+          <section className="workflow suppression-workflow" aria-label="Lista de exclusão">
+            <div className="section-topline"><div className="step-label"><span>01</span><h2>Lista de exclusão <span className="optional-label">OPCIONAL</span></h2></div>{suppressionList && <button className="text-button" onClick={clearSuppressionList} type="button"><X size={14} /> Remover lista</button>}</div>
+            {suppressionList ? (
+              <div className="blacklist-loaded"><span className="blacklist-icon"><FileText size={18} /></span><div className="blacklist-file-info"><strong>{suppressionList.fileName}</strong><span>{suppressionList.phones.length.toLocaleString("pt-BR")} telefones identificados</span></div><label className="blacklist-replace" htmlFor="suppression-file">Trocar TXT</label></div>
+            ) : (
+              <label className={`blacklist-upload${suppressionLoading ? " is-reading" : ""}`} htmlFor="suppression-file">
+                <input ref={suppressionInputRef} id="suppression-file" type="file" accept=".txt,text/plain" onChange={(event) => void importSuppressionList(event.target.files?.[0])} />
+                <span className="blacklist-icon"><Upload size={18} /></span><span className="blacklist-copy"><strong>{suppressionLoading ? "Lendo lista..." : "Enviar lista de telefones (TXT)"}</strong><span>Um telefone por linha; será comparado depois da normalização do CSV.</span></span><span className="blacklist-action">Selecionar arquivo</span>
+              </label>
+            )}
+            {suppressionList && <input ref={suppressionInputRef} className="blacklist-hidden-input" id="suppression-file" type="file" accept=".txt,text/plain" onChange={(event) => void importSuppressionList(event.target.files?.[0])} />}
+            {suppressionError && <p className="error-message" role="alert">{suppressionError}</p>}
+          </section>
+
           <section className="workflow" aria-label="Tratamento da planilha">
-            <div className="section-topline"><div className="step-label"><span>01</span><h2>Importe sua planilha</h2></div>{sheet && <button className="text-button" onClick={reset} type="button"><RotateCcw size={15} /> Trocar arquivo</button>}</div>
+            <div className="section-topline"><div className="step-label"><span>02</span><h2>Importe sua planilha</h2></div>{sheet && <button className="text-button" onClick={reset} type="button"><RotateCcw size={15} /> Trocar arquivo</button>}</div>
             {!sheet ? (
               <label className={`upload-zone${loading ? " is-reading" : ""}`} htmlFor="csv-file" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); void importCsv(event.dataTransfer.files[0]); }}>
                 <input ref={inputRef} id="csv-file" type="file" accept=".csv,text/csv" onChange={(event) => void importCsv(event.target.files?.[0])} />
@@ -323,13 +401,14 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
 
           {sheet && <>
             <section className="result-section">
-              <div className="section-topline"><div className="step-label"><span>02</span><h2>Confira o resultado</h2></div><span className="ready-label"><Check size={14} /> Pronto para exportar</span></div>
+              <div className="section-topline"><div className="step-label"><span>03</span><h2>Confira o resultado</h2></div><span className="ready-label"><Check size={14} /> Pronto para exportar</span></div>
               <div className="stats-row">
-                <div className="stat-block"><span className="stat-label">CONTATOS NA PLANILHA</span><strong>{sheet.rows.length.toLocaleString("pt-BR")}</strong></div>
+                <div className="stat-block"><span className="stat-label">{suppressionList ? "CONTATOS RESTANTES" : "CONTATOS NA PLANILHA"}</span><strong>{sheet.rows.length.toLocaleString("pt-BR")}</strong></div>
                 <div className="stat-block"><span className="stat-label">NOMES AJUSTADOS</span><strong>{adjustedNames.toLocaleString("pt-BR")}</strong></div>
                 <div className="stat-block stat-highlight"><span className="stat-label">NOMES PARA REVISAR</span><strong>{namesToReview.toLocaleString("pt-BR")}</strong></div>
                 <div className="stat-block"><span className="stat-label">TELEFONES ATUALIZADOS</span><strong>{changedPhones.toLocaleString("pt-BR")}</strong></div>
               </div>
+              {suppressionList && <p className="suppression-summary"><Check size={15} /> {sheet.removedCount.toLocaleString("pt-BR")} {sheet.removedCount === 1 ? "contato removido" : "contatos removidos"} pela lista {suppressionList.fileName}.</p>}
               <div className="table-frame"><div className="table-scroll"><table><thead><tr><th>triagem</th>{sheet.headers.map((header, index) => <th key={`${header}-${index}`}>{header}</th>)}</tr></thead><tbody>
                 {sheet.rows.slice(0, 6).map((row, rowIndex) => <tr className={sheet.reviewReasons[rowIndex].length ? "review-row" : ""} key={`${rowIndex}-${row[0]}`}>
                   <td>{sheet.reviewReasons[rowIndex].length ? <><span className="review-flag">Revisar</span><span className="review-detail">{sheet.reviewReasons[rowIndex].join(" · ")}</span></> : <span className="review-clear">OK</span>}</td>
