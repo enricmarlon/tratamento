@@ -123,13 +123,39 @@ function normalizeNameCase(name: string) {
   });
 }
 
+function hasRepeatedKeyboardPattern(word: string) {
+  if (word.length < 5) return false;
+  const vowelCount = word.match(/[aeiou]/g)?.length ?? 0;
+  if (vowelCount / word.length > 0.4) return false;
+
+  for (let patternLength = 2; patternLength <= 2; patternLength += 1) {
+    for (let start = 0; start <= word.length - patternLength; start += 1) {
+      const pattern = word.slice(start, start + patternLength);
+      let occurrences = 0;
+
+      for (let index = 0; index <= word.length - patternLength; index += 1) {
+        if (word.slice(index, index + patternLength) === pattern) {
+          occurrences += 1;
+          index += patternLength - 1;
+        }
+      }
+
+      if (occurrences >= 2 && occurrences * patternLength >= word.length * 0.6) return true;
+    }
+  }
+
+  return false;
+}
+
 function nameReviewReasons(name: string) {
   const reasons: string[] = [];
   const normalized = cleanHeader(name);
   const words = normalized.match(/[a-z0-9]+/g) ?? [];
+  const nameWords = normalized.match(/[a-z]+/g) ?? [];
   const decomposedName = name.normalize("NFD").toLocaleLowerCase("pt-BR");
 
   if (words.some((word) => nameAbbreviations.has(word))) reasons.push("Possível abreviação");
+  if (nameWords.some(hasRepeatedKeyboardPattern)) reasons.push("Possível sequência de teclas aleatórias");
   if (/[^\p{L}\p{M}\s'-]/u.test(name)) reasons.push("Caractere fora do padrão");
   if (/(^|[^\p{L}])\p{M}/u.test(decomposedName) || /(^|[^aeiou])\u0301/u.test(decomposedName) || /(?:Ã|Â)[^\u0000-\u007f]|�/u.test(name)) {
     reasons.push("Possível problema de acentuação/arquivo");
