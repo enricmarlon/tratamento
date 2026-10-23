@@ -240,7 +240,7 @@ export default function HomePanel() {
         <header className="topbar"><span className="breadcrumb">Ferramentas <span>/</span> Tratar contatos</span><span className="local-badge"><span /> Processamento local</span></header>
         <div className="content-wrap">
           <section className="page-heading">
-            <div><div className="eyebrow">ORGANIZE SUA BASE</div><h1>Contatos prontos<br className="mobile-break" /> para conversar.</h1><p>Padronize nomes e telefones, confira os cadastros sinalizados e exporte em Excel.</p></div>
+            <div><div className="eyebrow">ORGANIZE SUA BASE</div><h1>Contatos prontos<br className="mobile-break" /> para disparar.</h1><p>Padronize nomes e telefones, confira os cadastros sinalizados e exporte em Excel.</p></div>
             <div className="format-note"><span>CSV</span><ArrowRight size={15} /><span className="format-xlsx">XLSX</span></div>
           </section>
 
