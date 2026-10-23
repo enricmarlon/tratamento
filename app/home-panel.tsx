@@ -160,6 +160,7 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
   const [loading, setLoading] = useState(false);
   const [suppressionLoading, setSuppressionLoading] = useState(false);
   const [courseMessage, setCourseMessage] = useState("");
+  const [courseFileName, setCourseFileName] = useState("");
 
   async function importSuppressionList(file?: File) {
     if (!file) return;
@@ -283,10 +284,10 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  async function downloadExcel(courseText?: string) {
+  async function downloadExcel(courseText?: string, fileName?: string) {
     if (!sheet) return;
     const blob = await createExcelBlob(sheet.rows, courseText);
-    if (blob) downloadBlob(blob, safeExcelFileName(`${sheet.fileName.replace(/\.csv$/i, "")}_tratado`));
+    if (blob) downloadBlob(blob, safeExcelFileName(fileName || `${sheet.fileName.replace(/\.csv$/i, "")}_tratado`));
   }
 
   function openSplitter(courseText?: string) {
@@ -297,13 +298,14 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
 
   function openCourseEditor() {
     setCourseMessage("");
+    setCourseFileName(sheet ? `${sheet.fileName.replace(/\.csv$/i, "")}_tratado` : "");
     courseDialogRef.current?.showModal();
   }
 
   async function downloadWithCourse(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!courseMessage.trim()) return;
-    await downloadExcel(courseMessage);
+    await downloadExcel(courseMessage, courseFileName);
     courseDialogRef.current?.close();
   }
 
@@ -390,8 +392,10 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
                 <label className="course-field-label" htmlFor="course-message">Mensagem do curso</label>
                 <textarea id="course-message" className="course-textarea" value={courseMessage} onChange={(event) => setCourseMessage(event.target.value)} maxLength={32767} placeholder="Ex.: Inscrições abertas para o curso *intensivo* com certificado _incluso_." required />
                 <p className="course-format-help">Use *asteriscos* para negrito e _underscores_ para itálico.</p>
+                <label className="course-field-label" htmlFor="course-file-name">Nome do arquivo Excel</label>
+                <div className="course-file-name-row"><input id="course-file-name" className="course-file-name-input" type="text" value={courseFileName} onChange={(event) => setCourseFileName(event.target.value)} maxLength={180} required /><span>.xlsx</span></div>
                 <div className="course-preview-wrap"><span className="course-field-label">Prévia</span><div className="course-preview" aria-live="polite">{courseMessage ? parseCourseMessage(courseMessage).map((part, index) => part.bold ? <strong key={index}>{part.text}</strong> : part.italic ? <em key={index}>{part.text}</em> : <span key={index}>{part.text}</span>) : <span className="course-preview-empty">A prévia da mensagem aparecerá aqui.</span>}</div></div>
-                <div className="course-dialog-actions"><button className="course-cancel" type="button" onClick={() => courseDialogRef.current?.close()}>Cancelar</button><button className="course-cancel split-course-button" type="button" disabled={!courseMessage.trim()} onClick={() => openSplitter(courseMessage)}><Split size={15} /> Dividir base com curso</button><button className="download-button" type="submit" disabled={!courseMessage.trim()}><ArrowDownToLine size={16} /> Gerar Excel com curso</button></div>
+                <div className="course-dialog-actions"><button className="course-cancel" type="button" onClick={() => courseDialogRef.current?.close()}>Cancelar</button><button className="course-cancel split-course-button" type="button" disabled={!courseMessage.trim()} onClick={() => openSplitter(courseMessage)}><Split size={15} /> Dividir base com curso</button><button className="download-button" type="submit" disabled={!courseMessage.trim() || !courseFileName.trim()}><ArrowDownToLine size={16} /> Gerar Excel com curso</button></div>
               </form>
             </dialog>
           </>}

@@ -281,6 +281,10 @@ a:focus-visible,
 .course-textarea::placeholder { color: #829087; }
 .course-textarea:focus { border-color: #83c695; box-shadow: 0 0 0 2px rgba(131, 198, 149, .16); }
 .course-format-help { margin: 7px 0 18px; color: #9eafa2; font-size: 10px; }
+.course-file-name-row { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
+.course-file-name-input { width: 100%; min-width: 0; height: 39px; border: 1px solid #405347; border-radius: 5px; outline: none; background: #101813; padding: 0 11px; color: var(--ink); font-size: 12px; }
+.course-file-name-input:focus { border-color: #83c695; box-shadow: 0 0 0 2px rgba(131, 198, 149, .16); }
+.course-file-name-row > span { flex: 0 0 auto; color: #a1b0a5; font-size: 11px; }
 .course-preview-wrap { margin-bottom: 22px; }
 .course-preview { min-height: 76px; overflow-wrap: anywhere; border: 1px solid #344439; border-radius: 5px; background: #1c2820; padding: 11px 12px; color: #e0e9e2; font-size: 12px; line-height: 1.6; white-space: pre-wrap; }
 .course-preview-empty { color: #849389; }
