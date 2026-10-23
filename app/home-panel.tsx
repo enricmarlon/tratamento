@@ -1,7 +1,7 @@
 "use client";
 
 import ExcelJS from "exceljs";
-import { ArrowDownToLine, ArrowRight, Check, FileSpreadsheet, LockKeyhole, RotateCcw, Upload } from "lucide-react";
+import { ArrowDownToLine, ArrowRight, Check, FileSpreadsheet, LockKeyhole, RotateCcw, Upload, X } from "lucide-react";
 import { useRef, useState } from "react";
 
 type ContactSheet = {
@@ -14,6 +14,29 @@ type ContactSheet = {
   nameIndex: number;
   fileName: string;
 };
+
+type CourseMessagePart = {
+  text: string;
+  bold?: boolean;
+  underline?: boolean;
+};
+
+function parseCourseMessage(message: string): CourseMessagePart[] {
+  const parts: CourseMessagePart[] = [];
+  const markerPattern = /(\*[^*]+\*|_[^_]+_)/g;
+  let lastIndex = 0;
+
+  for (const match of message.matchAll(markerPattern)) {
+    const index = match.index ?? 0;
+    if (index > lastIndex) parts.push({ text: message.slice(lastIndex, index) });
+    const marker = match[0];
+    parts.push({ text: marker.slice(1, -1), ...(marker.startsWith("*") ? { bold: true } : { underline: true }) });
+    lastIndex = index + marker.length;
+  }
+
+  if (lastIndex < message.length) parts.push({ text: message.slice(lastIndex) });
+  return parts;
+}
 
 function delimiterFor(text: string) {
   const line = text.split(/\r?\n/, 1)[0] ?? "";
@@ -126,9 +149,11 @@ function nameReviewReasons(name: string) {
 
 export default function HomePanel() {
   const inputRef = useRef<HTMLInputElement>(null);
+  const courseDialogRef = useRef<HTMLDialogElement>(null);
   const [sheet, setSheet] = useState<ContactSheet | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [courseMessage, setCourseMessage] = useState("");
 
   async function importCsv(file?: File) {
     if (!file) return;
@@ -197,15 +222,46 @@ export default function HomePanel() {
     }
   }
 
-  async function downloadExcel() {
+  async function downloadExcel(courseText?: string) {
     if (!sheet) return;
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Contatos tratados");
-    worksheet.addRow(sheet.headers);
-    sheet.rows.forEach((row) => worksheet.addRow(row));
+    const headers = [...sheet.headers];
+    const rows = sheet.rows.map((row) => [...row]);
+
+    if (courseText !== undefined) {
+      const existingCourseIndex = headers.findIndex((header) => cleanHeader(header) === "curso");
+      if (existingCourseIndex < 0) {
+        headers.splice(4, 0, "curso");
+        rows.forEach((row) => row.splice(4, 0, courseText));
+      } else if (existingCourseIndex !== 4) {
+        const [courseHeader] = headers.splice(existingCourseIndex, 1);
+        headers.splice(4, 0, courseHeader);
+        rows.forEach((row) => {
+          const [courseValue] = row.splice(existingCourseIndex, 1);
+          row.splice(4, 0, courseValue ?? "");
+        });
+      }
+      rows.forEach((row) => { row[4] = courseText; });
+    }
+
+    worksheet.addRow(headers);
+    rows.forEach((row) => worksheet.addRow(row));
+    if (courseText !== undefined) {
+      const messageParts = parseCourseMessage(courseText);
+      rows.forEach((_, index) => {
+        worksheet.getCell(index + 2, 5).value = {
+          richText: messageParts.map((part) => ({
+            text: part.text,
+            ...(part.bold || part.underline ? { font: { ...(part.bold ? { bold: true } : {}), ...(part.underline ? { underline: true } : {}) } } : {}),
+          })),
+        };
+        worksheet.getCell(index + 2, 5).alignment = { vertical: "top", wrapText: true };
+      });
+    }
     worksheet.getRow(1).font = { bold: true };
     worksheet.views = [{ state: "frozen", ySplit: 1 }];
-    worksheet.columns = sheet.headers.map((header) => ({ width: Math.min(Math.max(header.length + 4, 16), 32) }));
+    worksheet.columns = headers.map((header) => ({ width: cleanHeader(header) === "curso" && courseText !== undefined ? 42 : Math.min(Math.max(header.length + 4, 16), 32) }));
 
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer as BlobPart], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
@@ -215,6 +271,18 @@ export default function HomePanel() {
     anchor.download = `${sheet.fileName.replace(/\.csv$/i, "")}_tratado.xlsx`;
     anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function openCourseEditor() {
+    setCourseMessage("");
+    courseDialogRef.current?.showModal();
+  }
+
+  async function downloadWithCourse(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!courseMessage.trim()) return;
+    await downloadExcel(courseMessage);
+    courseDialogRef.current?.close();
   }
 
   function reset() {
@@ -277,7 +345,17 @@ export default function HomePanel() {
                 </tr>)}
               </tbody></table></div>{sheet.rows.length > 6 && <div className="table-footer">Exibindo 6 de {sheet.rows.length.toLocaleString("pt-BR")} contatos</div>}</div>
             </section>
-            <section className="export-bar"><div className="export-copy"><span className="export-icon"><FileSpreadsheet size={19} /></span><div><strong>Planilha tratada</strong><span>Arquivo Excel · .xlsx</span></div></div><button className="download-button" onClick={() => void downloadExcel()} type="button"><ArrowDownToLine size={17} /> Baixar Excel</button></section>
+            <section className="export-bar"><div className="export-copy"><span className="export-icon"><FileSpreadsheet size={19} /></span><div><strong>Planilha tratada</strong><span>Arquivo Excel · .xlsx</span></div></div><div className="export-actions"><button className="download-button course-button" onClick={openCourseEditor} type="button"><FileSpreadsheet size={16} /> Adicionar curso e baixar</button><button className="download-button" onClick={() => void downloadExcel()} type="button"><ArrowDownToLine size={17} /> Baixar Excel</button></div></section>
+            <dialog ref={courseDialogRef} className="course-dialog" aria-labelledby="course-dialog-title" onClick={(event) => { if (event.target === event.currentTarget) courseDialogRef.current?.close(); }}>
+              <form className="course-form" onSubmit={(event) => void downloadWithCourse(event)}>
+                <div className="course-dialog-heading"><div><h2 id="course-dialog-title">Adicionar curso à planilha</h2><p>A mensagem será preenchida na coluna E para todos os contatos.</p></div><button className="course-close" type="button" aria-label="Fechar editor" onClick={() => courseDialogRef.current?.close()}><X size={17} /></button></div>
+                <label className="course-field-label" htmlFor="course-message">Mensagem do curso</label>
+                <textarea id="course-message" className="course-textarea" value={courseMessage} onChange={(event) => setCourseMessage(event.target.value)} maxLength={32767} placeholder="Ex.: Inscrições abertas para o curso *intensivo* com certificado _incluso_." required />
+                <p className="course-format-help">Use *asteriscos* para negrito e _sublinhados_ para sublinhar.</p>
+                <div className="course-preview-wrap"><span className="course-field-label">Prévia</span><div className="course-preview" aria-live="polite">{courseMessage ? parseCourseMessage(courseMessage).map((part, index) => part.bold ? <strong key={index}>{part.text}</strong> : part.underline ? <u key={index}>{part.text}</u> : <span key={index}>{part.text}</span>) : <span className="course-preview-empty">A prévia da mensagem aparecerá aqui.</span>}</div></div>
+                <div className="course-dialog-actions"><button className="course-cancel" type="button" onClick={() => courseDialogRef.current?.close()}>Cancelar</button><button className="download-button" type="submit" disabled={!courseMessage.trim()}><ArrowDownToLine size={16} /> Gerar Excel com curso</button></div>
+              </form>
+            </dialog>
           </>}
 
           <footer className="page-footer"><span>Feito para deixar sua base em ordem.</span><span><LockKeyhole size={13} /> Seus dados não saem do navegador</span></footer>
