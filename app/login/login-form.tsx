@@ -23,9 +23,9 @@ export default function LoginForm({ isConfigured }: { isConfigured: boolean }) {
   return (
     <main className="login-page">
       <section className="login-panel" aria-labelledby="login-title">
-        <Link className="brand login-brand" href="/" aria-label="Folha">
+        <Link className="brand login-brand" href="/" aria-label="Plan">
           <span className="brand-mark"><LockKeyhole size={19} /></span>
-          <span>folha<span className="brand-period">.</span></span>
+          <span>Plan</span>
         </Link>
         <div className="login-heading">
           <span className="eyebrow">ACESSO RESTRITO</span>

@@ -19,7 +19,7 @@ type ContactSheet = {
 type CourseMessagePart = {
   text: string;
   bold?: boolean;
-  underline?: boolean;
+  italic?: boolean;
 };
 
 function parseCourseMessage(message: string): CourseMessagePart[] {
@@ -31,7 +31,7 @@ function parseCourseMessage(message: string): CourseMessagePart[] {
     const index = match.index ?? 0;
     if (index > lastIndex) parts.push({ text: message.slice(lastIndex, index) });
     const marker = match[0];
-    parts.push({ text: marker.slice(1, -1), ...(marker.startsWith("*") ? { bold: true } : { underline: true }) });
+    parts.push({ text: marker.slice(1, -1), ...(marker.startsWith("*") ? { bold: true } : { italic: true }) });
     lastIndex = index + marker.length;
   }
 
@@ -249,14 +249,7 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
     worksheet.addRow(headers);
     rows.forEach((row) => worksheet.addRow(row));
     if (courseText !== undefined) {
-      const messageParts = parseCourseMessage(courseText);
       rows.forEach((_, index) => {
-        worksheet.getCell(index + 2, 5).value = {
-          richText: messageParts.map((part) => ({
-            text: part.text,
-            ...(part.bold || part.underline ? { font: { ...(part.bold ? { bold: true } : {}), ...(part.underline ? { underline: true } : {}) } } : {}),
-          })),
-        };
         worksheet.getCell(index + 2, 5).alignment = { vertical: "top", wrapText: true };
       });
     }
@@ -299,7 +292,7 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <a className="brand" href="#inicio" aria-label="Folha, início"><span className="brand-mark"><FileSpreadsheet size={20} /></span><span>folha<span className="brand-period">.</span></span></a>
+        <a className="brand" href="#inicio" aria-label="Plan, início"><span className="brand-mark"><FileSpreadsheet size={20} /></span><span>Plan</span></a>
         <div className="sidebar-caption">FERRAMENTAS</div>
         <div className="nav-item nav-item-active"><span className="nav-indicator" /><FileSpreadsheet size={17} /><span>Tratar contatos</span></div>
         <div className="sidebar-bottom"><LockKeyhole size={16} /><div><strong>Seus dados, protegidos</strong><p>Os arquivos ficam no seu dispositivo.</p></div></div>
@@ -352,8 +345,8 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
                 <div className="course-dialog-heading"><div><h2 id="course-dialog-title">Adicionar curso à planilha</h2><p>A mensagem será preenchida na coluna E para todos os contatos.</p></div><button className="course-close" type="button" aria-label="Fechar editor" onClick={() => courseDialogRef.current?.close()}><X size={17} /></button></div>
                 <label className="course-field-label" htmlFor="course-message">Mensagem do curso</label>
                 <textarea id="course-message" className="course-textarea" value={courseMessage} onChange={(event) => setCourseMessage(event.target.value)} maxLength={32767} placeholder="Ex.: Inscrições abertas para o curso *intensivo* com certificado _incluso_." required />
-                <p className="course-format-help">Use *asteriscos* para negrito e _sublinhados_ para sublinhar.</p>
-                <div className="course-preview-wrap"><span className="course-field-label">Prévia</span><div className="course-preview" aria-live="polite">{courseMessage ? parseCourseMessage(courseMessage).map((part, index) => part.bold ? <strong key={index}>{part.text}</strong> : part.underline ? <u key={index}>{part.text}</u> : <span key={index}>{part.text}</span>) : <span className="course-preview-empty">A prévia da mensagem aparecerá aqui.</span>}</div></div>
+                <p className="course-format-help">Use *asteriscos* para negrito e _underscores_ para itálico.</p>
+                <div className="course-preview-wrap"><span className="course-field-label">Prévia</span><div className="course-preview" aria-live="polite">{courseMessage ? parseCourseMessage(courseMessage).map((part, index) => part.bold ? <strong key={index}>{part.text}</strong> : part.italic ? <em key={index}>{part.text}</em> : <span key={index}>{part.text}</span>) : <span className="course-preview-empty">A prévia da mensagem aparecerá aqui.</span>}</div></div>
                 <div className="course-dialog-actions"><button className="course-cancel" type="button" onClick={() => courseDialogRef.current?.close()}>Cancelar</button><button className="download-button" type="submit" disabled={!courseMessage.trim()}><ArrowDownToLine size={16} /> Gerar Excel com curso</button></div>
               </form>
             </dialog>

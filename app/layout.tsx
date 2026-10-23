@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Folha | Tratamento de contatos",
+  title: "Plan | Tratamento de contatos",
   description: "Padronize telefones e exporte sua lista de contatos em Excel.",
 };
 

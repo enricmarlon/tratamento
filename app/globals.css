@@ -282,7 +282,7 @@ a:focus-visible,
 .course-preview-wrap { margin-bottom: 22px; }
 .course-preview { min-height: 76px; overflow-wrap: anywhere; border: 1px solid #344439; border-radius: 5px; background: #1c2820; padding: 11px 12px; color: #e0e9e2; font-size: 12px; line-height: 1.6; white-space: pre-wrap; }
 .course-preview-empty { color: #849389; }
-.course-preview u { text-decoration-thickness: 1px; text-underline-offset: 2px; }
+.course-preview em { font-style: italic; }
 .course-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .course-cancel { min-height: 38px; border: 1px solid #3a4a3e; border-radius: 5px; background: transparent; padding: 0 13px; color: #bfcbc1; font-size: 11px; }
 .course-cancel:hover { background: #223027; }
