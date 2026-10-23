@@ -73,6 +73,8 @@ button { cursor: pointer; }
 .brand-period { color: var(--coral); }
 .sidebar-caption { margin: 54px 0 11px 10px; color: #99a19b; font-size: 10px; font-weight: 700; }
 .nav-item { position: relative; display: flex; height: 42px; align-items: center; gap: 11px; border-radius: 6px; padding: 0 11px; color: #657069; font-size: 13px; }
+.tool-nav-link { text-decoration: none; }
+.nav-item-disabled { cursor: not-allowed; opacity: .45; }
 .nav-item-active { background: #f0f5f1; color: var(--green-dark); font-weight: 600; }
 .nav-indicator { position: absolute; left: -18px; width: 3px; height: 22px; border-radius: 0 3px 3px 0; background: var(--green); }
 .sidebar-bottom { display: flex; align-items: flex-start; gap: 10px; margin-top: auto; border-top: 1px solid var(--line); padding: 17px 2px 0; color: var(--green); }
@@ -284,10 +286,51 @@ a:focus-visible,
 .course-preview-empty { color: #849389; }
 .course-preview em { font-style: italic; }
 .course-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
-.course-cancel { min-height: 38px; border: 1px solid #3a4a3e; border-radius: 5px; background: transparent; padding: 0 13px; color: #bfcbc1; font-size: 11px; }
-.course-cancel:hover { background: #223027; }
+.course-cancel { display: inline-flex; min-height: 38px; align-items: center; justify-content: center; gap: 7px; border: 1px solid #49614f; border-radius: 5px; background: #202d23; padding: 0 13px; color: #d5e2d7; font-size: 11px; font-weight: 600; white-space: nowrap; transition: background 150ms ease, border-color 150ms ease, color 150ms ease; }
+.course-cancel:hover { border-color: #688c70; background: #293a2e; color: #f1f7f2; }
+.split-course-button { border-color: #347c53; background: #347c53; color: #f4fff6; }
+.split-course-button:hover:not(:disabled) { border-color: #419263; background: #419263; color: #fff; }
+.split-course-button:disabled { cursor: not-allowed; border-color: #315640; background: #24452f; color: #91b69b; opacity: 1; }
 .download-button:disabled { cursor: not-allowed; opacity: .45; transform: none; }
 .optional-label { margin-left: 6px; color: #91a096; font-size: 9px; font-weight: 600; }
+.split-nav-item { margin-top: 4px; color: #a4b1a7; text-decoration: none; }
+.split-nav-item:hover { background: #1b2b20; color: #bce9c8; }
+.split-workflow { scroll-margin-top: 22px; margin-top: 28px; padding-bottom: 21px; }
+.split-source-file { margin-top: 0; }
+.split-empty-state { display: flex; align-items: center; gap: 15px; margin-top: 22px; border-top: 1px solid #2c3b31; border-bottom: 1px solid #2c3b31; padding: 22px 0; }
+.split-empty-state .export-icon { flex: 0 0 auto; }
+.split-empty-state > div { min-width: 0; flex: 1; }
+.split-empty-state h2 { margin: 0; font-size: 14px; font-weight: 620; }
+.split-empty-state p { margin: 6px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.split-empty-state .download-button { text-decoration: none; }
+.split-description { margin: -4px 0 18px; color: var(--muted); font-size: 11px; }
+.split-course-note { display: inline-flex; align-items: center; gap: 5px; color: #91dda7; font-size: 10px; }
+.split-controls { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; margin-bottom: 15px; }
+.split-control-group { display: flex; flex-direction: column; gap: 7px; }
+.split-segment { display: inline-flex; align-self: flex-start; gap: 3px; border: 1px solid #35463a; border-radius: 5px; background: #131c16; padding: 3px; }
+.split-segment button { min-height: 31px; border: 0; border-radius: 3px; background: transparent; padding: 0 12px; color: #a1b0a5; font-size: 10px; }
+.split-segment button.is-selected { background: #2b5438; color: #d5f2dc; }
+.split-total { align-items: flex-end; }
+.split-total-valid, .split-total-invalid { font-size: 11px; font-weight: 600; }
+.split-total-valid { color: #91dda7; }
+.split-total-invalid { color: #f18b73; }
+.split-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.split-file-field { min-width: 0; border: 1px solid #304035; border-radius: 5px; background: #151f18; padding: 12px; }
+.split-input-row { display: flex; min-width: 0; align-items: center; gap: 7px; }
+.split-percent-input, .split-name-input { min-width: 0; height: 36px; border: 1px solid #405347; border-radius: 4px; outline: none; background: #101813; color: var(--ink); font-size: 11px; }
+.split-percent-input { width: 68px; padding: 0 8px; }
+.split-name-input { width: 100%; flex: 1; padding: 0 9px; }
+.split-percent-input:focus, .split-name-input:focus { border-color: #83c695; box-shadow: 0 0 0 2px rgba(131, 198, 149, .12); }
+.split-percent-sign, .split-extension { flex: 0 0 auto; color: #a1b0a5; font-size: 10px; }
+.split-actions { display: flex; align-items: center; gap: 12px; margin-top: 15px; }
+.split-actions > span { color: #91a096; font-size: 10px; }
+.split-download-list { display: grid; gap: 7px; margin-top: 14px; }
+.split-download-item { display: flex; min-height: 54px; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid #304035; border-radius: 5px; background: #151f18; padding: 8px 10px 8px 12px; }
+.split-download-item > div { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
+.split-download-item strong { overflow: hidden; color: #dce7de; font-size: 11px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.split-download-item span { color: #a1b0a5; font-size: 10px; }
+.split-download-item .download-button { min-height: 33px; padding: 0 10px; }
+.split-button { white-space: nowrap; }
 .blacklist-upload { position: relative; display: grid; min-height: 76px; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 12px; border: 1px dashed #49614f; border-radius: 6px; background: #17211a; padding: 12px 15px; cursor: pointer; transition: border-color 150ms ease, background 150ms ease; }
 .blacklist-upload:hover, .blacklist-upload:focus-within { border-color: #83c695; background: #1c2c21; }
 .blacklist-upload.is-reading { opacity: .7; pointer-events: none; }
@@ -306,6 +349,16 @@ a:focus-visible,
 @media (max-width: 680px) {
   .export-actions { width: 100%; flex-direction: column; }
   .export-actions button { width: 100%; min-height: 41px; }
+  .split-controls { align-items: flex-start; }
+  .split-fields { grid-template-columns: minmax(0, 1fr); }
+  .split-actions { align-items: flex-start; flex-direction: column; }
+  .split-actions button { width: 100%; }
+  .split-empty-state { align-items: stretch; flex-direction: column; }
+  .split-empty-state .export-icon { align-self: flex-start; }
+  .split-empty-state .download-button { width: 100%; min-height: 41px; }
+  .split-download-item { padding-left: 9px; }
+  .split-download-item .download-button { width: auto; flex: 0 0 auto; }
+  .course-dialog-actions .split-course-button { width: 100%; }
   .course-dialog { width: calc(100vw - 24px); max-height: 90dvh; }
   .course-form { padding: 22px 18px; }
   .course-textarea { min-height: 170px; }

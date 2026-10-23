@@ -1,33 +1,13 @@
 "use client";
 
-import ExcelJS from "exceljs";
-import { ArrowDownToLine, ArrowRight, Check, FileSpreadsheet, FileText, LockKeyhole, LogOut, RotateCcw, Upload, X } from "lucide-react";
+import { ArrowDownToLine, ArrowRight, Check, FileSpreadsheet, FileText, LockKeyhole, LogOut, RotateCcw, Split, Upload, X } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { signOut } from "./actions/auth";
+import { useWorkflow, type ContactSheet, type ContactSheetBase } from "./workflow-context";
+import { createExcelBlob as buildExcelBlob, safeExcelFileName } from "../lib/excel-export";
 import { cleanPhone, parseSuppressionList } from "../lib/phone-normalization";
-
-type ContactRecord = {
-  row: string[];
-  sourcePhones: string;
-  sourceNames: string;
-  reviewReasons: string[];
-};
-
-type ContactSheetBase = {
-  headers: string[];
-  allRecords: ContactRecord[];
-  phoneIndex: number;
-  nameIndex: number;
-  fileName: string;
-};
-
-type ContactSheet = ContactSheetBase & {
-  rows: string[][];
-  sourcePhones: string[];
-  sourceNames: string[];
-  reviewReasons: string[][];
-  removedCount: number;
-};
 
 type CourseMessagePart = {
   text: string;
@@ -169,10 +149,11 @@ function nameReviewReasons(name: string) {
 }
 
 export default function HomePanel({ userEmail }: { userEmail: string }) {
+  const router = useRouter();
+  const { sheet, setSheet, setSplitCourseText } = useWorkflow();
   const inputRef = useRef<HTMLInputElement>(null);
   const suppressionInputRef = useRef<HTMLInputElement>(null);
   const courseDialogRef = useRef<HTMLDialogElement>(null);
-  const [sheet, setSheet] = useState<ContactSheet | null>(null);
   const [suppressionList, setSuppressionList] = useState<{ fileName: string; phones: string[] } | null>(null);
   const [suppressionError, setSuppressionError] = useState("");
   const [error, setError] = useState("");
@@ -279,6 +260,7 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
         nameIndex,
         fileName: file.name,
       }, suppressionList?.phones ?? []));
+      setSplitCourseText(undefined);
     } catch {
       setSheet(null);
       setError("Não foi possível ler esse arquivo. Confira se ele está em formato CSV.");
@@ -287,48 +269,30 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
     }
   }
 
-  async function downloadExcel(courseText?: string) {
-    if (!sheet) return;
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Contatos tratados");
-    const headers = [...sheet.headers];
-    const rows = sheet.rows.map((row) => [...row]);
+  async function createExcelBlob(rowsToExport: string[][], courseText?: string) {
+    if (!sheet) return null;
+    return buildExcelBlob(sheet.headers, rowsToExport, courseText);
+  }
 
-    if (courseText !== undefined) {
-      const existingCourseIndex = headers.findIndex((header) => cleanHeader(header) === "curso");
-      if (existingCourseIndex < 0) {
-        headers.splice(4, 0, "curso");
-        rows.forEach((row) => row.splice(4, 0, courseText));
-      } else if (existingCourseIndex !== 4) {
-        const [courseHeader] = headers.splice(existingCourseIndex, 1);
-        headers.splice(4, 0, courseHeader);
-        rows.forEach((row) => {
-          const [courseValue] = row.splice(existingCourseIndex, 1);
-          row.splice(4, 0, courseValue ?? "");
-        });
-      }
-      rows.forEach((row) => { row[4] = courseText; });
-    }
-
-    worksheet.addRow(headers);
-    rows.forEach((row) => worksheet.addRow(row));
-    if (courseText !== undefined) {
-      rows.forEach((_, index) => {
-        worksheet.getCell(index + 2, 5).alignment = { vertical: "top", wrapText: true };
-      });
-    }
-    worksheet.getRow(1).font = { bold: true };
-    worksheet.views = [{ state: "frozen", ySplit: 1 }];
-    worksheet.columns = headers.map((header) => ({ width: cleanHeader(header) === "curso" && courseText !== undefined ? 42 : Math.min(Math.max(header.length + 4, 16), 32) }));
-
-    const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer as BlobPart], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  function downloadBlob(blob: Blob, fileName: string) {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `${sheet.fileName.replace(/\.csv$/i, "")}_tratado.xlsx`;
+    anchor.download = fileName;
     anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  async function downloadExcel(courseText?: string) {
+    if (!sheet) return;
+    const blob = await createExcelBlob(sheet.rows, courseText);
+    if (blob) downloadBlob(blob, safeExcelFileName(`${sheet.fileName.replace(/\.csv$/i, "")}_tratado`));
+  }
+
+  function openSplitter(courseText?: string) {
+    setSplitCourseText(courseText);
+    courseDialogRef.current?.close();
+    router.push("/dividir");
   }
 
   function openCourseEditor() {
@@ -346,19 +310,20 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
   function reset() {
     setSheet(null);
     setError("");
+    setSplitCourseText(undefined);
     if (inputRef.current) inputRef.current.value = "";
   }
 
   const changedPhones = sheet?.sourcePhones.filter((phone) => cleanPhone(phone) !== phone).length ?? 0;
   const adjustedNames = sheet?.sourceNames.filter((name, index) => name !== sheet.rows[index][sheet.nameIndex]).length ?? 0;
   const namesToReview = sheet?.reviewReasons.filter((reasons) => reasons.length > 0).length ?? 0;
-
   return (
     <div className="app-shell">
       <aside className="sidebar">
         <a className="brand" href="#inicio" aria-label="Plan, início"><span className="brand-mark"><FileSpreadsheet size={20} /></span><span>Plan</span></a>
         <div className="sidebar-caption">FERRAMENTAS</div>
-        <div className="nav-item nav-item-active"><span className="nav-indicator" /><FileSpreadsheet size={17} /><span>Tratar contatos</span></div>
+        <Link className="nav-item nav-item-active tool-nav-link" href="/"><span className="nav-indicator" /><FileSpreadsheet size={17} /><span>Tratar contatos</span></Link>
+        <Link className={`nav-item tool-nav-link${sheet ? "" : " nav-item-disabled"}`} href="/dividir" aria-disabled={!sheet} onClick={(event) => { if (!sheet) event.preventDefault(); }}><Split size={17} /><span>Dividir</span></Link>
         <div className="sidebar-bottom"><LockKeyhole size={16} /><div><strong>Seus dados, protegidos</strong><p>Os arquivos ficam no seu dispositivo.</p></div></div>
       </aside>
 
@@ -418,7 +383,7 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
                 </tr>)}
               </tbody></table></div>{sheet.rows.length > 6 && <div className="table-footer">Exibindo 6 de {sheet.rows.length.toLocaleString("pt-BR")} contatos</div>}</div>
             </section>
-            <section className="export-bar"><div className="export-copy"><span className="export-icon"><FileSpreadsheet size={19} /></span><div><strong>Planilha tratada</strong><span>Arquivo Excel · .xlsx</span></div></div><div className="export-actions"><button className="download-button course-button" onClick={openCourseEditor} type="button"><FileSpreadsheet size={16} /> Adicionar curso e baixar</button><button className="download-button" onClick={() => void downloadExcel()} type="button"><ArrowDownToLine size={17} /> Baixar Excel</button></div></section>
+            <section className="export-bar"><div className="export-copy"><span className="export-icon"><FileSpreadsheet size={19} /></span><div><strong>Planilha tratada</strong><span>Arquivo Excel · .xlsx</span></div></div><div className="export-actions"><button className="download-button split-button" onClick={() => openSplitter()} type="button"><Split size={16} /> Dividir base</button><button className="download-button course-button" onClick={openCourseEditor} type="button"><FileSpreadsheet size={16} /> Adicionar curso e baixar</button><button className="download-button" onClick={() => void downloadExcel()} type="button"><ArrowDownToLine size={17} /> Baixar Excel</button></div></section>
             <dialog ref={courseDialogRef} className="course-dialog" aria-labelledby="course-dialog-title" onClick={(event) => { if (event.target === event.currentTarget) courseDialogRef.current?.close(); }}>
               <form className="course-form" onSubmit={(event) => void downloadWithCourse(event)}>
                 <div className="course-dialog-heading"><div><h2 id="course-dialog-title">Adicionar curso à planilha</h2><p>A mensagem será preenchida na coluna E para todos os contatos.</p></div><button className="course-close" type="button" aria-label="Fechar editor" onClick={() => courseDialogRef.current?.close()}><X size={17} /></button></div>
@@ -426,7 +391,7 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
                 <textarea id="course-message" className="course-textarea" value={courseMessage} onChange={(event) => setCourseMessage(event.target.value)} maxLength={32767} placeholder="Ex.: Inscrições abertas para o curso *intensivo* com certificado _incluso_." required />
                 <p className="course-format-help">Use *asteriscos* para negrito e _underscores_ para itálico.</p>
                 <div className="course-preview-wrap"><span className="course-field-label">Prévia</span><div className="course-preview" aria-live="polite">{courseMessage ? parseCourseMessage(courseMessage).map((part, index) => part.bold ? <strong key={index}>{part.text}</strong> : part.italic ? <em key={index}>{part.text}</em> : <span key={index}>{part.text}</span>) : <span className="course-preview-empty">A prévia da mensagem aparecerá aqui.</span>}</div></div>
-                <div className="course-dialog-actions"><button className="course-cancel" type="button" onClick={() => courseDialogRef.current?.close()}>Cancelar</button><button className="download-button" type="submit" disabled={!courseMessage.trim()}><ArrowDownToLine size={16} /> Gerar Excel com curso</button></div>
+                <div className="course-dialog-actions"><button className="course-cancel" type="button" onClick={() => courseDialogRef.current?.close()}>Cancelar</button><button className="course-cancel split-course-button" type="button" disabled={!courseMessage.trim()} onClick={() => openSplitter(courseMessage)}><Split size={15} /> Dividir base com curso</button><button className="download-button" type="submit" disabled={!courseMessage.trim()}><ArrowDownToLine size={16} /> Gerar Excel com curso</button></div>
               </form>
             </dialog>
           </>}
