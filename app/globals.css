@@ -42,6 +42,30 @@ body {
 body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font-geist-sans), sans-serif; font-size: 14px; }
 button, input { font: inherit; }
 button { cursor: pointer; }
+.login-page { display: grid; min-height: 100vh; place-items: center; padding: 28px 18px; background: radial-gradient(ellipse at 50% 0%, rgba(73, 132, 88, .14), transparent 48%), var(--paper); }
+.auth-loading { display: grid; min-height: 100vh; place-items: center; color: #a1b0a5; font-size: 12px; }
+.login-panel { width: min(100%, 430px); border: 1px solid #2c3b31; border-radius: 8px; background: #141d17; padding: 34px; box-shadow: 0 24px 72px rgba(0, 0, 0, .24); }
+.login-brand { margin-bottom: 42px; }
+.login-heading { margin-bottom: 25px; }
+.login-heading .eyebrow { display: block; margin-bottom: 10px; }
+.login-heading h1 { margin: 0; font-size: 27px; font-weight: 620; line-height: 1.2; }
+.login-heading p { margin: 9px 0 0; color: #a1b0a5; font-size: 12px; line-height: 1.55; }
+.login-form { display: flex; flex-direction: column; }
+.login-form label { margin: 0 0 7px; color: #d7e2d9; font-size: 11px; font-weight: 650; }
+.login-form input { width: 100%; min-height: 43px; margin-bottom: 18px; border: 1px solid #405347; border-radius: 5px; outline: none; background: #101813; padding: 0 12px; color: var(--ink); font-size: 13px; }
+.login-form input::placeholder { color: #829087; }
+.login-form input:focus { border-color: #83c695; box-shadow: 0 0 0 2px rgba(131, 198, 149, .16); }
+.login-submit { display: inline-flex; min-height: 43px; align-items: center; justify-content: center; gap: 9px; margin-top: 3px; border: 0; border-radius: 5px; background: #347c53; color: #f4fff6; font-size: 12px; font-weight: 620; transition: background 150ms ease; }
+.login-submit:hover { background: #419263; }
+.login-submit:disabled { cursor: not-allowed; opacity: .7; }
+.login-error, .login-notice { margin: 0 0 16px; border-left: 2px solid var(--coral); background: #38231f; padding: 10px 12px; color: #ffad96; font-size: 11px; line-height: 1.5; }
+.login-notice { border-color: #d5a44d; background: #30291d; color: #f2d397; }
+.login-footnote { display: flex; align-items: center; justify-content: center; gap: 7px; margin: 22px 0 0; color: #91a096; font-size: 10px; }
+.topbar-actions { display: flex; align-items: center; gap: 17px; }
+.auth-email { max-width: 220px; overflow: hidden; color: #c0cbc2; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.topbar-actions form { margin: 0; }
+.logout-button { display: inline-flex; min-height: 32px; align-items: center; gap: 7px; border: 1px solid #405347; border-radius: 5px; background: #1b2720; padding: 0 10px; color: #c5d2c8; font-size: 11px; }
+.logout-button:hover { border-color: #83c695; background: #24372a; }
 .app-shell { min-height: 100vh; }
 .sidebar { position: fixed; inset: 0 auto 0 0; z-index: 2; display: flex; width: 232px; flex-direction: column; border-right: 1px solid var(--line); background: #fff; padding: 28px 18px 20px; }
 .brand { display: inline-flex; width: fit-content; align-items: center; gap: 9px; color: var(--ink); font-size: 21px; font-weight: 740; text-decoration: none; }
@@ -137,6 +161,7 @@ td { height: 39px; border-top: 1px solid #eef0ed; color: #49534c; font-size: 11p
   .sidebar-caption, .nav-item, .sidebar-bottom { display: none; }
   .main-content { margin-left: 0; min-height: calc(100vh - 58px); }
   .topbar { height: 48px; padding: 0 18px; } .breadcrumb { font-size: 10px; } .local-badge { font-size: 9px; }
+  .topbar-actions { gap: 8px; } .auth-email { display: none; } .logout-button { min-height: 30px; padding: 0 7px; }
   .content-wrap { padding: 34px 18px 20px; } .page-heading { min-height: 152px; }
   .page-heading h1 { font-size: 32px; } .page-heading p { max-width: 300px; font-size: 12px; line-height: 1.55; }
   .mobile-break { display: initial; } .format-note { gap: 5px; margin-top: 20px; }
@@ -272,4 +297,6 @@ a:focus-visible,
   .course-dialog-heading h2 { font-size: 17px; }
   .course-dialog-actions { align-items: stretch; flex-direction: column-reverse; }
   .course-dialog-actions button { width: 100%; min-height: 41px; }
+  .login-panel { padding: 28px 22px; }
+  .login-brand { margin-bottom: 34px; }
 }

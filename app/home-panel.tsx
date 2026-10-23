@@ -1,8 +1,9 @@
 "use client";
 
 import ExcelJS from "exceljs";
-import { ArrowDownToLine, ArrowRight, Check, FileSpreadsheet, LockKeyhole, RotateCcw, Upload, X } from "lucide-react";
+import { ArrowDownToLine, ArrowRight, Check, FileSpreadsheet, LockKeyhole, LogOut, RotateCcw, Upload, X } from "lucide-react";
 import { useRef, useState } from "react";
+import { signOut } from "./actions/auth";
 
 type ContactSheet = {
   headers: string[];
@@ -147,7 +148,7 @@ function nameReviewReasons(name: string) {
   return reasons;
 }
 
-export default function HomePanel() {
+export default function HomePanel({ userEmail }: { userEmail: string }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const courseDialogRef = useRef<HTMLDialogElement>(null);
   const [sheet, setSheet] = useState<ContactSheet | null>(null);
@@ -305,7 +306,7 @@ export default function HomePanel() {
       </aside>
 
       <main className="main-content" id="inicio">
-        <header className="topbar"><span className="breadcrumb">Ferramentas <span>/</span> Tratar contatos</span><span className="local-badge"><span /> Processamento local</span></header>
+        <header className="topbar"><span className="breadcrumb">Ferramentas <span>/</span> Tratar contatos</span><div className="topbar-actions"><span className="local-badge"><span /> Processamento local</span><span className="auth-email" title={userEmail}>{userEmail}</span><form action={signOut}><button className="logout-button" type="submit"><LogOut size={15} /><span>Sair</span></button></form></div></header>
         <div className="content-wrap">
           <section className="page-heading">
             <div><div className="eyebrow">ORGANIZE SUA BASE</div><h1>Contatos prontos<br className="mobile-break" /> para disparar.</h1><p>Padronize nomes e telefones, confira os cadastros sinalizados e exporte em Excel.</p></div>
