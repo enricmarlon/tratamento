@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+/local-uploads/*
+!/local-uploads/.gitkeep
 
 # next.js
 /.next/

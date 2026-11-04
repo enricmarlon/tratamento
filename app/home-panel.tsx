@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDownToLine, ArrowRight, Check, FileSpreadsheet, FileText, LockKeyhole, LogOut, RotateCcw, Split, Upload, X } from "lucide-react";
+import { ArrowDownToLine, ArrowRight, Check, ClipboardList, FileSpreadsheet, FileText, LockKeyhole, LogOut, RotateCcw, Split, Upload, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
@@ -364,6 +364,7 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
         <div className="sidebar-caption">FERRAMENTAS</div>
         <Link className="nav-item nav-item-active tool-nav-link" href="/"><span className="nav-indicator" /><FileSpreadsheet size={17} /><span>Tratar contatos</span></Link>
         <Link className={`nav-item tool-nav-link${sheet ? "" : " nav-item-disabled"}`} href="/dividir" aria-disabled={!sheet} onClick={(event) => { if (!sheet) event.preventDefault(); }}><Split size={17} /><span>Dividir</span></Link>
+        <Link className="nav-item tool-nav-link" href="/tratamento-sei"><ClipboardList size={17} /><span>Tratamento SEI</span></Link>
         <div className="sidebar-bottom"><LockKeyhole size={16} /><div><strong>Seus dados, protegidos</strong><p>Os arquivos ficam no seu dispositivo.</p></div></div>
       </aside>
 

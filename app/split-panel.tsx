@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDownToLine, ArrowRight, Check, FileSpreadsheet, LockKeyhole, LogOut, Split } from "lucide-react";
+import { ArrowDownToLine, ArrowRight, Check, ClipboardList, FileSpreadsheet, LockKeyhole, LogOut, Split } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { signOut } from "./actions/auth";
@@ -95,6 +95,7 @@ export default function SplitPanel({ userEmail }: { userEmail: string }) {
         <div className="sidebar-caption">FERRAMENTAS</div>
         <Link className="nav-item tool-nav-link" href="/"><FileSpreadsheet size={17} /><span>Tratar contatos</span></Link>
         <Link className="nav-item nav-item-active split-nav-item tool-nav-link" href="/dividir"><span className="nav-indicator" /><Split size={17} /><span>Dividir</span></Link>
+        <Link className="nav-item tool-nav-link" href="/tratamento-sei"><ClipboardList size={17} /><span>Tratamento SEI</span></Link>
         <div className="sidebar-bottom"><LockKeyhole size={16} /><div><strong>Seus dados, protegidos</strong><p>Os arquivos ficam no seu dispositivo.</p></div></div>
       </aside>
 
