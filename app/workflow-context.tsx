@@ -25,9 +25,17 @@ export type ContactSheet = ContactSheetBase & {
   removedCount: number;
 };
 
+export type SplitSource = {
+  headers: string[];
+  rows: string[][];
+  fileName: string;
+};
+
 type WorkflowContextValue = {
   sheet: ContactSheet | null;
   setSheet: Dispatch<SetStateAction<ContactSheet | null>>;
+  splitSource: SplitSource | null;
+  setSplitSource: Dispatch<SetStateAction<SplitSource | null>>;
   splitCourseText: string | undefined;
   setSplitCourseText: Dispatch<SetStateAction<string | undefined>>;
 };
@@ -36,10 +44,11 @@ const WorkflowContext = createContext<WorkflowContextValue | null>(null);
 
 export function WorkflowProvider({ children }: { children: ReactNode }) {
   const [sheet, setSheet] = useState<ContactSheet | null>(null);
+  const [splitSource, setSplitSource] = useState<SplitSource | null>(null);
   const [splitCourseText, setSplitCourseText] = useState<string | undefined>();
 
   return (
-    <WorkflowContext.Provider value={{ sheet, setSheet, splitCourseText, setSplitCourseText }}>
+    <WorkflowContext.Provider value={{ sheet, setSheet, splitSource, setSplitSource, splitCourseText, setSplitCourseText }}>
       {children}
     </WorkflowContext.Provider>
   );

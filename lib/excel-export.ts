@@ -9,7 +9,7 @@ export function safeExcelFileName(value: string) {
   return `${name || "contatos"}.xlsx`;
 }
 
-export async function createExcelBlob(headersToExport: string[], rowsToExport: string[][], courseText?: string) {
+export async function createExcelBlob(headersToExport: string[], rowsToExport: string[][], courseText?: string, courseColumnIndex = 4) {
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet("Contatos tratados");
   const headers = [...headersToExport];
@@ -17,25 +17,31 @@ export async function createExcelBlob(headersToExport: string[], rowsToExport: s
 
   if (courseText !== undefined) {
     const existingCourseIndex = headers.findIndex((header) => cleanHeader(header) === "curso");
+    const targetCourseIndex = Math.max(0, Math.min(courseColumnIndex, headers.length));
     if (existingCourseIndex < 0) {
-      headers.splice(4, 0, "curso");
-      rows.forEach((row) => row.splice(4, 0, courseText));
-    } else if (existingCourseIndex !== 4) {
+      headers.splice(targetCourseIndex, 0, "curso");
+      rows.forEach((row) => row.splice(targetCourseIndex, 0, courseText));
+    } else if (existingCourseIndex !== targetCourseIndex) {
       const [courseHeader] = headers.splice(existingCourseIndex, 1);
-      headers.splice(4, 0, courseHeader);
+      const adjustedTargetIndex = Math.max(0, Math.min(courseColumnIndex, headers.length));
+      headers.splice(adjustedTargetIndex, 0, courseHeader);
       rows.forEach((row) => {
-        const [courseValue] = row.splice(existingCourseIndex, 1);
-        row.splice(4, 0, courseValue ?? "");
+        row.splice(existingCourseIndex, 1);
+        row.splice(adjustedTargetIndex, 0, "");
       });
     }
-    rows.forEach((row) => { row[4] = courseText; });
+    const finalCourseIndex = existingCourseIndex >= 0 && existingCourseIndex !== targetCourseIndex
+      ? Math.max(0, Math.min(courseColumnIndex, headers.length - 1))
+      : targetCourseIndex;
+    rows.forEach((row) => { row[finalCourseIndex] = courseText; });
+    courseColumnIndex = finalCourseIndex;
   }
 
   worksheet.addRow(headers);
   rows.forEach((row) => worksheet.addRow(row));
   if (courseText !== undefined) {
     rows.forEach((_, index) => {
-      worksheet.getCell(index + 2, 5).alignment = { vertical: "top", wrapText: true };
+      worksheet.getCell(index + 2, courseColumnIndex + 1).alignment = { vertical: "top", wrapText: true };
     });
   }
   worksheet.getRow(1).font = { bold: true };

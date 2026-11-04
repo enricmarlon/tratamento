@@ -1,9 +1,11 @@
 "use client";
 
-import { ArrowDownToLine, Check, ClipboardList, FileSpreadsheet, LockKeyhole, LogOut, RotateCcw, Split, Upload } from "lucide-react";
+import { ArrowDownToLine, Check, ClipboardList, FileSpreadsheet, LockKeyhole, LogOut, RotateCcw, Split, Upload, X } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { signOut } from "./actions/auth";
+import { useWorkflow } from "./workflow-context";
 import { readSeiSpreadsheet, type SeiColumn, type SeiColumnId, type SeiSpreadsheet } from "../lib/sei-spreadsheet";
 import { createExcelBlob, safeExcelFileName } from "../lib/excel-export";
 
@@ -30,11 +32,15 @@ function downloadBlob(blob: Blob, fileName: string) {
 }
 
 export default function SeiTreatmentPanel({ userEmail }: { userEmail: string }) {
+  const router = useRouter();
+  const { setSplitSource, setSplitCourseText } = useWorkflow();
   const inputRef = useRef<HTMLInputElement>(null);
+  const courseDialogRef = useRef<HTMLDialogElement>(null);
   const [sheet, setSheet] = useState<SeiSpreadsheet | null>(null);
   const [selectedColumns, setSelectedColumns] = useState<SeiColumnId[]>([]);
   const [columnNames, setColumnNames] = useState<Partial<Record<SeiColumnId, string>>>({});
   const [fileName, setFileName] = useState("");
+  const [courseMessage, setCourseMessage] = useState("");
   const [reduceSpaces, setReduceSpaces] = useState(false);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -64,6 +70,8 @@ export default function SeiTreatmentPanel({ userEmail }: { userEmail: string }) 
       }
 
       setSheet(imported);
+      setSplitSource(null);
+      setSplitCourseText(undefined);
       setSelectedColumns(imported.columns.map((column) => column.id));
       setColumnNames(Object.fromEntries(imported.columns.map((column) => [column.id, column.id === "celular" ? "telefone" : column.label])));
       setFileName(`${file.name.replace(ACCEPTED_EXTENSIONS, "")}_organizado`);
@@ -79,6 +87,8 @@ export default function SeiTreatmentPanel({ userEmail }: { userEmail: string }) 
 
   function reset() {
     setSheet(null);
+    setSplitSource(null);
+    setSplitCourseText(undefined);
     setSelectedColumns([]);
     setColumnNames({});
     setFileName("");
@@ -95,21 +105,49 @@ export default function SeiTreatmentPanel({ userEmail }: { userEmail: string }) 
 
   const visibleColumns = sheet?.columns.filter((column) => selectedColumns.includes(column.id)) ?? [];
 
-  async function exportSpreadsheet() {
-    if (!sheet || !visibleColumns.length || exporting) return;
+  function getSelectedData() {
+    if (!sheet) return null;
+    return {
+      headers: visibleColumns.map((column) => columnNames[column.id]?.trim() || column.label),
+      rows: sheet.rows.map((record) => visibleColumns.map((column) => cleanCell(record[column.id] ?? "", reduceSpaces))),
+      fileName: fileName.replace(ACCEPTED_EXTENSIONS, "").trim() || "tratamento_sei",
+    };
+  }
+
+  async function exportSpreadsheet(courseText?: string) {
+    const data = getSelectedData();
+    if (!data || !visibleColumns.length || exporting) return false;
     setExporting(true);
     setError("");
     try {
-      const headers = visibleColumns.map((column) => columnNames[column.id]?.trim() || column.label);
-      const rows = sheet.rows.map((record) => visibleColumns.map((column) => cleanCell(record[column.id] ?? "", reduceSpaces)));
-      const blob = await createExcelBlob(headers, rows);
-      const baseName = fileName.replace(ACCEPTED_EXTENSIONS, "").trim() || "tratamento_sei";
-      downloadBlob(blob, safeExcelFileName(baseName));
+      const blob = await createExcelBlob(data.headers, data.rows, courseText, data.headers.length);
+      downloadBlob(blob, safeExcelFileName(data.fileName));
+      return true;
     } catch {
       setError("Não foi possível gerar o arquivo Excel. Tente novamente.");
+      return false;
     } finally {
       setExporting(false);
     }
+  }
+
+  function openCourseEditor() {
+    setCourseMessage("");
+    courseDialogRef.current?.showModal();
+  }
+
+  async function downloadWithCourse(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (await exportSpreadsheet(courseMessage.trim())) courseDialogRef.current?.close();
+  }
+
+  function sendToSplitter(courseText?: string) {
+    const data = getSelectedData();
+    if (!data || !data.headers.length) return;
+    setSplitSource({ ...data, fileName: safeExcelFileName(data.fileName) });
+    setSplitCourseText(courseText);
+    courseDialogRef.current?.close();
+    router.push("/dividir");
   }
 
   function updateColumnName(column: SeiColumn, value: string) {
@@ -178,10 +216,25 @@ export default function SeiTreatmentPanel({ userEmail }: { userEmail: string }) 
               ) : <p className="sei-no-columns">Selecione pelo menos uma coluna para ver a prévia.</p>}
             </section>
 
-            <section className="sei-export-bar" aria-label="Exportar arquivo">
+            <section className="workflow sei-workflow sei-finalize" aria-label="Finalizar planilha">
+              <div className="section-topline"><div className="step-label"><span>04</span><h2>Como quer finalizar?</h2></div></div>
               <label className="sei-filename-field"><span>Nome do arquivo</span><div><input type="text" value={fileName} onChange={(event) => setFileName(event.target.value)} maxLength={150} /><span>.xlsx</span></div></label>
-              <button className="download-button" type="button" onClick={() => void exportSpreadsheet()} disabled={!visibleColumns.length || exporting}><ArrowDownToLine size={16} /> {exporting ? "Gerando Excel..." : "Baixar Excel organizado"}</button>
+              <div className="sei-final-actions">
+                <button className="download-button" type="button" onClick={openCourseEditor}><FileSpreadsheet size={16} /> Adicionar curso e baixar</button>
+                <button className="download-button sei-secondary-action" type="button" onClick={() => sendToSplitter()}><Split size={16} /> Dividir por porcentagem</button>
+                <button className="download-button sei-secondary-action" type="button" onClick={() => void exportSpreadsheet()} disabled={!visibleColumns.length || exporting}><ArrowDownToLine size={16} /> {exporting ? "Gerando Excel..." : "Baixar Excel organizado"}</button>
+              </div>
             </section>
+            <dialog ref={courseDialogRef} className="course-dialog" aria-labelledby="sei-course-dialog-title" onClick={(event) => { if (event.target === event.currentTarget) courseDialogRef.current?.close(); }}>
+              <form className="course-form" onSubmit={(event) => void downloadWithCourse(event)}>
+                <div className="course-dialog-heading"><div><h2 id="sei-course-dialog-title">Adicionar curso à planilha SEI</h2><p>A mensagem será adicionada em uma nova coluna ao final da planilha.</p></div><button className="course-close" type="button" aria-label="Fechar editor" onClick={() => courseDialogRef.current?.close()}><X size={17} /></button></div>
+                <label className="course-field-label" htmlFor="sei-course-message">Mensagem do curso</label>
+                <textarea id="sei-course-message" className="course-textarea" value={courseMessage} onChange={(event) => setCourseMessage(event.target.value)} maxLength={32767} placeholder="Digite a mensagem do curso" required />
+                <label className="course-field-label" htmlFor="sei-course-file-name">Nome do arquivo Excel</label>
+                <div className="course-file-name-row"><input id="sei-course-file-name" className="course-file-name-input" type="text" value={fileName} onChange={(event) => setFileName(event.target.value)} maxLength={150} required /><span>.xlsx</span></div>
+                <div className="course-dialog-actions"><button className="course-cancel" type="button" onClick={() => courseDialogRef.current?.close()}>Cancelar</button><button className="course-cancel split-course-button" type="button" disabled={!courseMessage.trim()} onClick={() => sendToSplitter(courseMessage.trim())}><Split size={15} /> Dividir base com curso</button><button className="download-button" type="submit" disabled={!courseMessage.trim() || exporting}><ArrowDownToLine size={16} /> {exporting ? "Gerando Excel..." : "Gerar Excel com curso"}</button></div>
+              </form>
+            </dialog>
           </>}
 
           <footer className="page-footer"><span>Feito para deixar sua base em ordem.</span><span><LockKeyhole size={13} /> Seus dados não saem do navegador</span></footer>

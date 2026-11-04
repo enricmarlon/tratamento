@@ -358,6 +358,11 @@ a:focus-visible,
 .sei-filename-field > div { display: flex; align-items: center; gap: 8px; }
 .sei-filename-field > div > span { flex: 0 0 auto; color: #a1b0a5; font-size: 11px; font-weight: 400; }
 .sei-export-bar .download-button { min-height: 38px; }
+.sei-finalize { margin-top: 24px; padding-bottom: 20px; }
+.sei-finalize > .sei-filename-field { max-width: 430px; margin-bottom: 14px; }
+.sei-final-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 8px; }
+.sei-secondary-action { border: 1px solid #49614f; background: #202d23; color: #d5e2d7; white-space: normal; }
+.sei-secondary-action:hover:not(:disabled) { background: #293a2e; }
 .split-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .split-file-field { min-width: 0; border: 1px solid #304035; border-radius: 5px; background: #151f18; padding: 12px; }
 .split-input-row { display: flex; min-width: 0; align-items: center; gap: 7px; }

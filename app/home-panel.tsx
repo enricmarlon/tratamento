@@ -176,7 +176,7 @@ function nameReviewReasons(name: string) {
 
 export default function HomePanel({ userEmail }: { userEmail: string }) {
   const router = useRouter();
-  const { sheet, setSheet, setSplitCourseText } = useWorkflow();
+  const { sheet, setSheet, setSplitSource, setSplitCourseText } = useWorkflow();
   const inputRef = useRef<HTMLInputElement>(null);
   const suppressionInputRef = useRef<HTMLInputElement>(null);
   const courseDialogRef = useRef<HTMLDialogElement>(null);
@@ -299,6 +299,7 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
         nameIndex,
         fileName: file.name,
       }, suppressionList?.phones ?? []));
+      setSplitSource(null);
       setSplitCourseText(undefined);
     } catch {
       setSheet(null);
@@ -310,7 +311,7 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
 
   async function createExcelBlob(rowsToExport: string[][], courseText?: string) {
     if (!sheet) return null;
-    return buildExcelBlob(sheet.headers, rowsToExport, courseText);
+    return buildExcelBlob(sheet.headers, rowsToExport, courseText, sheet.headers.length);
   }
 
   function downloadBlob(blob: Blob, fileName: string) {
@@ -329,6 +330,7 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
   }
 
   function openSplitter(courseText?: string) {
+    setSplitSource(null);
     setSplitCourseText(courseText);
     courseDialogRef.current?.close();
     router.push("/dividir");
@@ -349,6 +351,7 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
 
   function reset() {
     setSheet(null);
+    setSplitSource(null);
     setError("");
     setSplitCourseText(undefined);
     if (inputRef.current) inputRef.current.value = "";

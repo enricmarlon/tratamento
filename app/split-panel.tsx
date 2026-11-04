@@ -19,7 +19,8 @@ function downloadBlob(blob: Blob, fileName: string) {
 }
 
 export default function SplitPanel({ userEmail }: { userEmail: string }) {
-  const { sheet, splitCourseText } = useWorkflow();
+  const { sheet, splitSource, splitCourseText } = useWorkflow();
+  const activeSheet = splitSource ?? sheet;
   const [splitParts, setSplitParts] = useState<2 | 3>(2);
   const [splitPercentages, setSplitPercentages] = useState(["70", "30"]);
   const [splitFileNames, setSplitFileNames] = useState<string[]>([]);
@@ -36,22 +37,22 @@ export default function SplitPanel({ userEmail }: { userEmail: string }) {
   }
 
   async function prepareSplitFiles() {
-    if (!sheet || preparing) return;
+    if (!activeSheet || preparing) return;
     const percentages = splitPercentages.slice(0, splitParts).map(Number);
     const totalPercentage = percentages.reduce((total, percentage) => total + percentage, 0);
     if (percentages.some((percentage) => !Number.isFinite(percentage) || percentage <= 0) || Math.abs(totalPercentage - 100) > 0.001) {
       setSplitError("Informe percentuais maiores que zero cuja soma seja 100%.");
       return;
     }
-    if (sheet.rows.length < splitParts) {
-      setSplitError(`A base precisa ter pelo menos ${splitParts} contatos para gerar arquivos não vazios.`);
+    if (activeSheet.rows.length < splitParts) {
+      setSplitError(`A base precisa ter pelo menos ${splitParts} ${splitSource ? "registros" : "contatos"} para gerar arquivos não vazios.`);
       return;
     }
 
     setPreparing(true);
     setSplitError("");
     setSplitFiles([]);
-    const baseName = sheet.fileName.replace(/\.csv$/i, "");
+    const baseName = activeSheet.fileName.replace(/\.(csv|xlsx|xls|ods)$/i, "");
     const preparedFiles: PreparedFile[] = [];
     let start = 0;
 
@@ -59,10 +60,10 @@ export default function SplitPanel({ userEmail }: { userEmail: string }) {
       for (let index = 0; index < splitParts; index += 1) {
         const remainingParts = splitParts - index - 1;
         const partSize = remainingParts === 0
-          ? sheet.rows.length - start
-          : Math.min(Math.max(Math.round(sheet.rows.length * percentages[index] / 100), 1), sheet.rows.length - start - remainingParts);
-        const rows = sheet.rows.slice(start, start + partSize);
-        const blob = await createExcelBlob(sheet.headers, rows, splitCourseText);
+          ? activeSheet.rows.length - start
+          : Math.min(Math.max(Math.round(activeSheet.rows.length * percentages[index] / 100), 1), activeSheet.rows.length - start - remainingParts);
+        const rows = activeSheet.rows.slice(start, start + partSize);
+        const blob = await createExcelBlob(activeSheet.headers, rows, splitCourseText, activeSheet.headers.length);
         preparedFiles.push({
           fileName: safeExcelFileName(splitFileNames[index] || `${baseName}_parte_${index + 1}`),
           blob,
@@ -86,7 +87,7 @@ export default function SplitPanel({ userEmail }: { userEmail: string }) {
   const splitPercentageTotal = splitPercentages.slice(0, splitParts).reduce((total, percentage) => total + (Number(percentage) || 0), 0);
   const validSplitConfiguration = splitPercentages.slice(0, splitParts).every((percentage) => Number(percentage) > 0)
     && Math.abs(splitPercentageTotal - 100) <= 0.001
-    && (sheet?.rows.length ?? 0) >= splitParts;
+    && (activeSheet?.rows.length ?? 0) >= splitParts;
 
   return (
     <div className="app-shell">
@@ -103,13 +104,13 @@ export default function SplitPanel({ userEmail }: { userEmail: string }) {
         <header className="topbar"><span className="breadcrumb">Ferramentas <span>/</span> Dividir base</span><div className="topbar-actions"><span className="local-badge"><span /> Processamento local</span><span className="auth-email" title={userEmail}>{userEmail}</span><form action={signOut}><button className="logout-button" type="submit"><LogOut size={15} /><span>Sair</span></button></form></div></header>
         <div className="content-wrap">
           <section className="page-heading">
-            <div><div className="eyebrow">FERRAMENTAS DE PLANILHA</div><h1>Dividir sua base.</h1><p>Separe os contatos tratados em arquivos Excel independentes.</p></div>
+            <div><div className="eyebrow">FERRAMENTAS DE PLANILHA</div><h1>Dividir sua base.</h1><p>Separe uma base organizada em arquivos Excel independentes.</p></div>
             <div className="format-note"><span>BASE</span><ArrowRight size={15} /><span className="format-xlsx">XLSX</span></div>
           </section>
 
-          {sheet ? (
+          {activeSheet ? (
             <>
-              <div className="file-loaded split-source-file"><div className="loaded-file-icon"><FileSpreadsheet size={20} /></div><div className="loaded-file-info"><strong>{sheet.fileName}</strong><span>{sheet.rows.length.toLocaleString("pt-BR")} contatos disponíveis</span></div><span className="loaded-check"><Check size={16} /></span></div>
+              <div className="file-loaded split-source-file"><div className="loaded-file-icon"><FileSpreadsheet size={20} /></div><div className="loaded-file-info"><strong>{activeSheet.fileName}</strong><span>{activeSheet.rows.length.toLocaleString("pt-BR")} {splitSource ? "registros" : "contatos"} disponíveis</span></div><span className="loaded-check"><Check size={16} /></span></div>
               <section className="workflow split-workflow" aria-label="Dividir base">
                 <div className="section-topline"><div className="step-label"><span>01</span><h2>Configure os arquivos</h2></div>{splitCourseText !== undefined && <span className="split-course-note"><Check size={14} /> Curso incluído</span>}</div>
                 <div className="split-controls">
@@ -120,7 +121,7 @@ export default function SplitPanel({ userEmail }: { userEmail: string }) {
                   <div className="split-control-group split-total"><span className="course-field-label">Distribuição</span><span className={Math.abs(splitPercentageTotal - 100) <= 0.001 ? "split-total-valid" : "split-total-invalid"}>Soma: {splitPercentageTotal.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%</span></div>
                 </div>
                 <div className="split-fields">{Array.from({ length: splitParts }, (_, index) => {
-                  const defaultName = `${sheet.fileName.replace(/\.csv$/i, "")}_parte_${index + 1}`;
+                  const defaultName = `${activeSheet.fileName.replace(/\.(csv|xlsx|xls|ods)$/i, "")}_parte_${index + 1}`;
                   return <div className="split-file-field" key={index}>
                     <label className="course-field-label" htmlFor={`split-percent-${index}`}>Arquivo {index + 1}</label>
                     <div className="split-input-row"><input id={`split-percent-${index}`} className="split-percent-input" type="number" min="0.1" max="99.9" step="0.1" value={splitPercentages[index] ?? ""} onChange={(event) => { const next = [...splitPercentages]; next[index] = event.target.value; setSplitPercentages(next); setSplitFiles([]); setSplitError(""); }} aria-label={`Porcentagem do arquivo ${index + 1}`} /><span className="split-percent-sign">%</span><input className="split-name-input" type="text" value={splitFileNames[index] ?? defaultName} onChange={(event) => { const next = [...splitFileNames]; next[index] = event.target.value; setSplitFileNames(next); setSplitFiles([]); setSplitError(""); }} aria-label={`Nome do arquivo ${index + 1}`} /><span className="split-extension">.xlsx</span></div>
@@ -128,14 +129,14 @@ export default function SplitPanel({ userEmail }: { userEmail: string }) {
                 })}</div>
                 {splitError && <p className="error-message" role="alert">{splitError}</p>}
                 <div className="split-actions"><button className="download-button" type="button" onClick={() => void prepareSplitFiles()} disabled={!validSplitConfiguration || preparing}><Split size={16} /> {preparing ? "Preparando..." : "Preparar arquivos"}</button><span>Os arquivos ficam prontos para baixar individualmente.</span></div>
-                {splitFiles.length > 0 && <div className="split-download-list" aria-live="polite">{splitFiles.map((file) => <div className="split-download-item" key={file.fileName}><div><strong>{file.fileName}</strong><span>{file.contacts.toLocaleString("pt-BR")} contatos</span></div><button className="download-button" type="button" onClick={() => downloadBlob(file.blob, file.fileName)}><ArrowDownToLine size={15} /> Baixar</button></div>)}</div>}
+                {splitFiles.length > 0 && <div className="split-download-list" aria-live="polite">{splitFiles.map((file) => <div className="split-download-item" key={file.fileName}><div><strong>{file.fileName}</strong><span>{file.contacts.toLocaleString("pt-BR")} {splitSource ? "registros" : "contatos"}</span></div><button className="download-button" type="button" onClick={() => downloadBlob(file.blob, file.fileName)}><ArrowDownToLine size={15} /> Baixar</button></div>)}</div>}
               </section>
             </>
           ) : (
             <section className="split-empty-state">
               <span className="export-icon"><Split size={20} /></span>
-              <div><h2>Nenhuma base pronta para dividir</h2><p>Importe e trate um CSV primeiro. Depois, volte aqui pela coluna de ferramentas.</p></div>
-              <Link className="download-button" href="/"><FileSpreadsheet size={16} /> Ir para Tratar contatos</Link>
+              <div><h2>Nenhuma base pronta para dividir</h2><p>Prepare uma base em Tratar contatos ou Tratamento SEI antes de dividir.</p></div>
+              <Link className="download-button" href="/tratamento-sei"><ClipboardList size={16} /> Ir para Tratamento SEI</Link>
             </section>
           )}
 
