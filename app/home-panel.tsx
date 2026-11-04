@@ -225,11 +225,12 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
     if (suppressionInputRef.current) suppressionInputRef.current.value = "";
   }
 
-  async function importCsv(file?: File) {
+  async function importSpreadsheet(file?: File) {
     if (!file) return;
     setError("");
-    if (!file.name.toLowerCase().endsWith(".csv")) {
-      setError("Selecione um arquivo CSV para continuar.");
+    const extension = file.name.toLowerCase().match(/\.(csv|xlsx|ods)$/)?.[1];
+    if (!extension) {
+      setError("Selecione um arquivo CSV, XLSX ou ODS para continuar.");
       return;
     }
     if (file.size > 20 * 1024 * 1024) {
@@ -239,8 +240,19 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
 
     setLoading(true);
     try {
-      const text = await file.text();
-      const parsed = parseCsv(text, delimiterFor(text));
+      let parsed: string[][];
+      if (extension === "csv") {
+        const text = await file.text();
+        parsed = parseCsv(text, delimiterFor(text));
+      } else {
+        const XLSX = await import("@e965/xlsx");
+        const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
+        const firstSheet = workbook.SheetNames[0];
+        parsed = firstSheet
+          ? XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[firstSheet], { header: 1, raw: false, defval: "" })
+            .map((row) => row.map((cell) => String(cell)))
+          : [];
+      }
       const headers = parsed[0]?.map((header) => header.trim()) ?? [];
       const normalized = headers.map(cleanHeader);
       const missing = ["nome", "sobrenome", "telefone", "email"].filter((name) => !normalized.includes(name));
@@ -255,7 +267,7 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
       const sourceRows = parsed.slice(1).filter((row) => row.some((cell) => cell.trim()));
       if (!sourceRows.length) {
         setSheet(null);
-        setError("O CSV não contém contatos para tratar.");
+        setError("A planilha não contém contatos para tratar.");
         return;
       }
 
@@ -290,7 +302,7 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
       setSplitCourseText(undefined);
     } catch {
       setSheet(null);
-      setError("Não foi possível ler esse arquivo. Confira se ele está em formato CSV.");
+      setError("Não foi possível ler esse arquivo. Confira se ele está em formato CSV, XLSX ou ODS.");
     } finally {
       setLoading(false);
     }
@@ -313,7 +325,7 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
   async function downloadExcel(courseText?: string, fileName?: string) {
     if (!sheet) return;
     const blob = await createExcelBlob(sheet.rows, courseText);
-    if (blob) downloadBlob(blob, safeExcelFileName(fileName || `${sheet.fileName.replace(/\.csv$/i, "")}_tratado`));
+    if (blob) downloadBlob(blob, safeExcelFileName(fileName || `${sheet.fileName.replace(/\.(csv|xlsx|ods)$/i, "")}_tratado`));
   }
 
   function openSplitter(courseText?: string) {
@@ -324,7 +336,7 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
 
   function openCourseEditor() {
     setCourseMessage("");
-    setCourseFileName(sheet ? `${sheet.fileName.replace(/\.csv$/i, "")}_tratado` : "");
+    setCourseFileName(sheet ? `${sheet.fileName.replace(/\.(csv|xlsx|ods)$/i, "")}_tratado` : "");
     courseDialogRef.current?.showModal();
   }
 
@@ -380,10 +392,10 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
           <section className="workflow" aria-label="Tratamento da planilha">
             <div className="section-topline"><div className="step-label"><span>02</span><h2>Importe sua planilha</h2></div>{sheet && <button className="text-button" onClick={reset} type="button"><RotateCcw size={15} /> Trocar arquivo</button>}</div>
             {!sheet ? (
-              <label className={`upload-zone${loading ? " is-reading" : ""}`} htmlFor="csv-file" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); void importCsv(event.dataTransfer.files[0]); }}>
-                <input ref={inputRef} id="csv-file" type="file" accept=".csv,text/csv" onChange={(event) => void importCsv(event.target.files?.[0])} />
-                <span className="upload-icon"><Upload size={21} /></span><span className="upload-title">{loading ? "Lendo sua planilha..." : "Solte o arquivo CSV aqui"}</span>
-                <span className="upload-description">ou <span className="upload-link">escolha no computador</span></span><span className="upload-meta">CSV · até 20 MB</span>
+              <label className={`upload-zone${loading ? " is-reading" : ""}`} htmlFor="spreadsheet-file" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); void importSpreadsheet(event.dataTransfer.files[0]); }}>
+                <input ref={inputRef} id="spreadsheet-file" type="file" accept=".csv,.xlsx,.ods,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.oasis.opendocument.spreadsheet" onChange={(event) => void importSpreadsheet(event.target.files?.[0])} />
+                <span className="upload-icon"><Upload size={21} /></span><span className="upload-title">{loading ? "Lendo sua planilha..." : "Solte um arquivo CSV, XLSX ou ODS aqui"}</span>
+                <span className="upload-description">ou <span className="upload-link">escolha no computador</span></span><span className="upload-meta">CSV · XLSX · ODS · até 20 MB</span>
               </label>
             ) : (
               <div className="file-loaded"><div className="loaded-file-icon"><FileSpreadsheet size={20} /></div><div className="loaded-file-info"><strong>{sheet.fileName}</strong><span>{sheet.rows.length.toLocaleString("pt-BR")} contatos identificados</span></div><span className="loaded-check"><Check size={16} /></span></div>
