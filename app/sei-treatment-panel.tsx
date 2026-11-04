@@ -65,7 +65,7 @@ export default function SeiTreatmentPanel({ userEmail }: { userEmail: string }) 
 
       setSheet(imported);
       setSelectedColumns(imported.columns.map((column) => column.id));
-      setColumnNames(Object.fromEntries(imported.columns.map((column) => [column.id, column.label])));
+      setColumnNames(Object.fromEntries(imported.columns.map((column) => [column.id, column.id === "celular" ? "telefone" : column.label])));
       setFileName(`${file.name.replace(ACCEPTED_EXTENSIONS, "")}_organizado`);
       setReduceSpaces(false);
     } catch {

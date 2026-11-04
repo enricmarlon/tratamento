@@ -1,6 +1,7 @@
 const COLUMN_DEFINITIONS = [
   { id: "matricula", label: "Matrícula", aliases: ["matricula"] },
   { id: "nome", label: "Nome do Aluno", aliases: ["nome do aluno"] },
+  { id: "primeiroNome", label: "nome", aliases: [] },
   { id: "nascimento", label: "Data Nascimento", aliases: ["data nascimento", "data de nascimento"] },
   { id: "cpf", label: "CPF", aliases: ["cpf"] },
   { id: "telefoneResidencial", label: "Telefone Residencial", aliases: ["telefone residencial"] },
@@ -26,6 +27,28 @@ export type SeiSpreadsheet = {
 
 function normalizeHeader(value: string) {
   return value.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function firstName(value: string) {
+  const first = value.trim().split(/\s+/)[0] ?? "";
+  if (!first) return "";
+  const lowercase = first.toLocaleLowerCase("pt-BR");
+  return lowercase.charAt(0).toLocaleUpperCase("pt-BR") + lowercase.slice(1);
+}
+
+function normalizeBrazilianMobile(value: string) {
+  const digits = value.replace(/\D/g, "");
+  if (!digits) return "";
+
+  const hasCountryCode = digits.startsWith("55") && digits.length >= 12;
+  const nationalNumber = hasCountryCode ? digits.slice(2) : digits;
+  let normalized = hasCountryCode ? digits : `55${digits}`;
+
+  if (nationalNumber.length === 10) {
+    normalized = `55${nationalNumber.slice(0, 2)}9${nationalNumber.slice(2)}`;
+  }
+
+  return normalized;
 }
 
 function findHeader(row: string[]) {
@@ -98,6 +121,8 @@ export async function readSeiSpreadsheet(file: File): Promise<SeiSpreadsheet> {
 
       const studentName = record.nome ?? "";
       if (!studentName || normalizeHeader(studentName).startsWith("total matriculados")) continue;
+      record.primeiroNome = firstName(studentName);
+      record.celular = normalizeBrazilianMobile(record.celular ?? "");
       records.push(record);
     }
   }
