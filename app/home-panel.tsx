@@ -7,6 +7,7 @@ import { useRef, useState } from "react";
 import { signOut } from "./actions/auth";
 import { useWorkflow, type ContactSheet, type ContactSheetBase } from "./workflow-context";
 import { createExcelBlob as buildExcelBlob, safeExcelFileName } from "../lib/excel-export";
+import { mapContactHeaders } from "../lib/contact-import";
 import { cleanPhone, parseSuppressionList } from "../lib/phone-normalization";
 
 type CourseMessagePart = {
@@ -253,17 +254,14 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
             .map((row) => row.map((cell) => String(cell)))
           : [];
       }
-      const headers = parsed[0]?.map((header) => header.trim()) ?? [];
-      const normalized = headers.map(cleanHeader);
-      const missing = ["nome", "sobrenome", "telefone", "email"].filter((name) => !normalized.includes(name));
-      if (missing.length) {
+      const sourceHeaders = parsed[0]?.map((header) => header.trim()) ?? [];
+      if (!sourceHeaders.some(Boolean)) {
         setSheet(null);
-        setError(`Não encontrei as colunas: ${missing.join(", ")}.`);
+        setError("A primeira linha precisa conter os nomes das colunas.");
         return;
       }
 
-      const phoneIndex = normalized.indexOf("telefone");
-      const nameIndex = normalized.indexOf("nome");
+      const { headers, nameIndex, phoneIndex } = mapContactHeaders(sourceHeaders);
       const sourceRows = parsed.slice(1).filter((row) => row.some((cell) => cell.trim()));
       if (!sourceRows.length) {
         setSheet(null);
@@ -273,14 +271,15 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
 
       const records = sourceRows.map((source, sourceIndex) => {
         const row = headers.map((_, index) => source[index] ?? "");
-        const sourceName = row[nameIndex];
-        const reasons = nameReviewReasons(sourceName);
-        row[nameIndex] = normalizeNameCase(sourceName);
-        row[phoneIndex] = cleanPhone(row[phoneIndex]);
+        const sourceName = nameIndex >= 0 ? row[nameIndex] : "";
+        const sourcePhone = phoneIndex >= 0 ? row[phoneIndex] : "";
+        const reasons = sourceName ? nameReviewReasons(sourceName) : [];
+        if (nameIndex >= 0 && sourceName) row[nameIndex] = normalizeNameCase(sourceName);
+        if (phoneIndex >= 0) row[phoneIndex] = cleanPhone(sourcePhone);
         return {
           row,
           sourceName,
-          sourcePhone: source[phoneIndex] ?? "",
+          sourcePhone,
           reasons,
           sourceIndex,
         };
@@ -358,7 +357,9 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
   }
 
   const changedPhones = sheet?.sourcePhones.filter((phone) => cleanPhone(phone) !== phone).length ?? 0;
-  const adjustedNames = sheet?.sourceNames.filter((name, index) => name !== sheet.rows[index][sheet.nameIndex]).length ?? 0;
+  const adjustedNames = sheet && sheet.nameIndex >= 0
+    ? sheet.sourceNames.filter((name, index) => name !== sheet.rows[index][sheet.nameIndex]).length
+    : 0;
   const namesToReview = sheet?.reviewReasons.filter((reasons) => reasons.length > 0).length ?? 0;
   return (
     <div className="app-shell">
