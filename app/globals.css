@@ -331,6 +331,7 @@ a:focus-visible,
 .sei-workflow { margin-top: 24px; padding-bottom: 22px; }
 .sei-selected-count, .sei-preview-count { color: #9baa9f; font-size: 10px; }
 .sei-options-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid #29372d; padding: 0 0 14px; }
+.contact-column-options { justify-content: flex-end; }
 .sei-space-toggle { display: inline-flex; align-items: center; gap: 9px; cursor: pointer; }
 .sei-space-toggle input, .sei-checkbox-cell input { width: 15px; height: 15px; accent-color: #83d29b; }
 .sei-space-toggle span { display: flex; flex-direction: column; gap: 4px; }
@@ -344,7 +345,7 @@ a:focus-visible,
 .sei-column-row:last-child { border-bottom: 0; }
 .sei-column-row.is-excluded .sei-original-name { color: #7d8c81; }
 .sei-checkbox-cell { display: flex; align-items: center; padding-left: 4px; }
-.sei-original-name { color: #d4ded6; font-size: 11px; }
+.sei-original-name { overflow: hidden; color: #d4ded6; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .sei-rename-input, .sei-filename-field input { width: 100%; min-width: 0; height: 34px; border: 1px solid #35463a; border-radius: 4px; outline: none; background: #131c16; padding: 0 9px; color: #edf4ee; font-size: 11px; }
 .sei-rename-input:focus, .sei-filename-field input:focus { border-color: #83c695; box-shadow: 0 0 0 2px rgba(131, 198, 149, .12); }
 .sei-rename-input:disabled { opacity: .4; }

@@ -7,7 +7,7 @@ import { useRef, useState } from "react";
 import { signOut } from "./actions/auth";
 import { useWorkflow, type ContactSheet, type ContactSheetBase } from "./workflow-context";
 import { createExcelBlob as buildExcelBlob, safeExcelFileName } from "../lib/excel-export";
-import { mapContactHeaders } from "../lib/contact-import";
+import { decodeCsv, mapContactHeaders } from "../lib/contact-import";
 import { cleanPhone, parseSuppressionList } from "../lib/phone-normalization";
 
 type CourseMessagePart = {
@@ -188,6 +188,9 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
   const [suppressionLoading, setSuppressionLoading] = useState(false);
   const [courseMessage, setCourseMessage] = useState("");
   const [courseFileName, setCourseFileName] = useState("");
+  const [sourceHeaders, setSourceHeaders] = useState<string[]>([]);
+  const [selectedColumns, setSelectedColumns] = useState<number[]>([]);
+  const [columnNames, setColumnNames] = useState<string[]>([]);
 
   async function importSuppressionList(file?: File) {
     if (!file) return;
@@ -243,7 +246,7 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
     try {
       let parsed: string[][];
       if (extension === "csv") {
-        const text = await file.text();
+        const text = decodeCsv(await file.arrayBuffer());
         parsed = parseCsv(text, delimiterFor(text));
       } else {
         const XLSX = await import("@e965/xlsx");
@@ -298,6 +301,9 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
         nameIndex,
         fileName: file.name,
       }, suppressionList?.phones ?? []));
+      setSourceHeaders(sourceHeaders);
+      setSelectedColumns(headers.map((_, index) => index));
+      setColumnNames(headers);
       setSplitSource(null);
       setSplitCourseText(undefined);
     } catch {
@@ -308,9 +314,27 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
     }
   }
 
-  async function createExcelBlob(rowsToExport: string[][], courseText?: string) {
+  const visibleColumnIndexes = sheet
+    ? sheet.headers.map((_, index) => index).filter((index) => selectedColumns.includes(index))
+    : [];
+
+  function getSelectedData() {
     if (!sheet) return null;
-    return buildExcelBlob(sheet.headers, rowsToExport, courseText, sheet.headers.length);
+    return {
+      headers: visibleColumnIndexes.map((index) => columnNames[index]?.trim() || sheet.headers[index]),
+      rows: sheet.rows.map((row) => visibleColumnIndexes.map((index) => row[index] ?? "")),
+      fileName: `${sheet.fileName.replace(/\.(csv|xlsx|ods)$/i, "")}_tratado`,
+    };
+  }
+
+  function toggleColumn(index: number) {
+    setSelectedColumns((current) => current.includes(index)
+      ? current.filter((columnIndex) => columnIndex !== index)
+      : [...current, index]);
+  }
+
+  function updateColumnName(index: number, value: string) {
+    setColumnNames((current) => current.map((name, columnIndex) => columnIndex === index ? value : name));
   }
 
   function downloadBlob(blob: Blob, fileName: string) {
@@ -323,13 +347,16 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
   }
 
   async function downloadExcel(courseText?: string, fileName?: string) {
-    if (!sheet) return;
-    const blob = await createExcelBlob(sheet.rows, courseText);
-    if (blob) downloadBlob(blob, safeExcelFileName(fileName || `${sheet.fileName.replace(/\.(csv|xlsx|ods)$/i, "")}_tratado`));
+    const data = getSelectedData();
+    if (!data?.headers.length) return;
+    const blob = await buildExcelBlob(data.headers, data.rows, courseText, data.headers.length);
+    downloadBlob(blob, safeExcelFileName(fileName || data.fileName));
   }
 
   function openSplitter(courseText?: string) {
-    setSplitSource(null);
+    const data = getSelectedData();
+    if (!data?.headers.length) return;
+    setSplitSource({ ...data, fileName: safeExcelFileName(data.fileName) });
     setSplitCourseText(courseText);
     courseDialogRef.current?.close();
     router.push("/dividir");
@@ -353,6 +380,9 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
     setSplitSource(null);
     setError("");
     setSplitCourseText(undefined);
+    setSourceHeaders([]);
+    setSelectedColumns([]);
+    setColumnNames([]);
     if (inputRef.current) inputRef.current.value = "";
   }
 
@@ -406,12 +436,30 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
               <div className="file-loaded"><div className="loaded-file-icon"><FileSpreadsheet size={20} /></div><div className="loaded-file-info"><strong>{sheet.fileName}</strong><span>{sheet.rows.length.toLocaleString("pt-BR")} contatos identificados</span></div><span className="loaded-check"><Check size={16} /></span></div>
             )}
             {error && <p className="error-message" role="alert">{error}</p>}
-            <div className="column-hint"><span className="hint-label">COLUNAS ESPERADAS</span><div className="column-list">{["nome", "sobrenome", "telefone", "email"].map((column) => <span className="column-chip" key={column}>{column}</span>)}</div></div>
           </section>
 
           {sheet && <>
+            <section className="workflow sei-workflow" aria-label="Organizar colunas da base de contatos">
+              <div className="section-topline"><div className="step-label"><span>03</span><h2>Escolha e renomeie as colunas</h2></div><span className="sei-selected-count">{visibleColumnIndexes.length} de {sheet.headers.length} selecionadas</span></div>
+              <div className="sei-options-row contact-column-options">
+                <div className="sei-column-actions"><button className="text-button" type="button" onClick={() => setSelectedColumns(sheet.headers.map((_, index) => index))}>Todas</button><button className="text-button" type="button" onClick={() => setSelectedColumns([])}>Nenhuma</button></div>
+              </div>
+              <div className="sei-column-list">
+                <div className="sei-column-header"><span>Manter</span><span>Coluna original</span><span>Nome no Excel</span></div>
+                {sheet.headers.map((header, index) => {
+                  const selected = selectedColumns.includes(index);
+                  const sourceHeader = sourceHeaders[index] ?? header;
+                  return <div className={`sei-column-row${selected ? "" : " is-excluded"}`} key={`${sourceHeader}-${index}`}>
+                    <label className="sei-checkbox-cell"><input type="checkbox" checked={selected} onChange={() => toggleColumn(index)} aria-label={`Manter ${sourceHeader}`} /></label>
+                    <span className="sei-original-name">{sourceHeader}</span>
+                    <input className="sei-rename-input" type="text" value={columnNames[index] ?? header} onChange={(event) => updateColumnName(index, event.target.value)} aria-label={`Renomear coluna ${sourceHeader}`} disabled={!selected} />
+                  </div>;
+                })}
+              </div>
+            </section>
+
             <section className="result-section">
-              <div className="section-topline"><div className="step-label"><span>03</span><h2>Confira o resultado</h2></div><span className="ready-label"><Check size={14} /> Pronto para exportar</span></div>
+              <div className="section-topline"><div className="step-label"><span>04</span><h2>Confira o resultado</h2></div><span className="ready-label"><Check size={14} /> Pronto para exportar</span></div>
               <div className="stats-row">
                 <div className="stat-block"><span className="stat-label">{suppressionList ? "CONTATOS RESTANTES" : "CONTATOS NA PLANILHA"}</span><strong>{sheet.rows.length.toLocaleString("pt-BR")}</strong></div>
                 <div className="stat-block"><span className="stat-label">NOMES AJUSTADOS</span><strong>{adjustedNames.toLocaleString("pt-BR")}</strong></div>
@@ -419,16 +467,19 @@ export default function HomePanel({ userEmail }: { userEmail: string }) {
                 <div className="stat-block"><span className="stat-label">TELEFONES ATUALIZADOS</span><strong>{changedPhones.toLocaleString("pt-BR")}</strong></div>
               </div>
               {suppressionList && <p className="suppression-summary"><Check size={15} /> {sheet.removedCount.toLocaleString("pt-BR")} {sheet.removedCount === 1 ? "contato removido" : "contatos removidos"} pela lista {suppressionList.fileName}.</p>}
-              <div className="table-frame"><div className="table-scroll"><table><thead><tr><th>triagem</th>{sheet.headers.map((header, index) => <th key={`${header}-${index}`}>{header}</th>)}</tr></thead><tbody>
+              <div className="table-frame"><div className="table-scroll"><table><thead><tr><th>triagem</th>{visibleColumnIndexes.map((index) => <th key={`${sheet.headers[index]}-${index}`}>{columnNames[index]?.trim() || sheet.headers[index]}</th>)}</tr></thead><tbody>
                 {sheet.rows.slice(0, 6).map((row, rowIndex) => <tr className={sheet.reviewReasons[rowIndex].length ? "review-row" : ""} key={`${rowIndex}-${row[0]}`}>
                   <td>{sheet.reviewReasons[rowIndex].length ? <><span className="review-flag">Revisar</span><span className="review-detail">{sheet.reviewReasons[rowIndex].join(" · ")}</span></> : <span className="review-clear">OK</span>}</td>
-                  {row.map((cell, cellIndex) => <td className={cellIndex === sheet.phoneIndex ? "phone-cell" : ""} key={`${rowIndex}-${cellIndex}`}>
+                  {visibleColumnIndexes.map((cellIndex) => {
+                    const cell = row[cellIndex] ?? "";
+                    return <td className={cellIndex === sheet.phoneIndex ? "phone-cell" : ""} key={`${rowIndex}-${cellIndex}`}>
                     {cellIndex === sheet.nameIndex && sheet.sourceNames[rowIndex] !== cell ? <span className="phone-change"><span className="old-phone">{sheet.sourceNames[rowIndex] || "vazio"}</span><ArrowRight size={13} /><span>{cell || "vazio"}</span></span> : cellIndex === sheet.phoneIndex && sheet.sourcePhones[rowIndex] !== cell ? <span className="phone-change"><span className="old-phone">{sheet.sourcePhones[rowIndex] || "vazio"}</span><ArrowRight size={13} /><span>{cell || "vazio"}</span></span> : cell || <span className="empty-cell">—</span>}
-                  </td>)}
+                    </td>;
+                  })}
                 </tr>)}
               </tbody></table></div>{sheet.rows.length > 6 && <div className="table-footer">Exibindo 6 de {sheet.rows.length.toLocaleString("pt-BR")} contatos</div>}</div>
             </section>
-            <section className="export-bar"><div className="export-copy"><span className="export-icon"><FileSpreadsheet size={19} /></span><div><strong>Planilha tratada</strong><span>Arquivo Excel · .xlsx</span></div></div><div className="export-actions"><button className="download-button split-button" onClick={() => openSplitter()} type="button"><Split size={16} /> Dividir base</button><button className="download-button course-button" onClick={openCourseEditor} type="button"><FileSpreadsheet size={16} /> Adicionar curso e baixar</button><button className="download-button" onClick={() => void downloadExcel()} type="button"><ArrowDownToLine size={17} /> Baixar Excel</button></div></section>
+            <section className="export-bar"><div className="export-copy"><span className="export-icon"><FileSpreadsheet size={19} /></span><div><strong>Planilha tratada</strong><span>Arquivo Excel · .xlsx</span></div></div><div className="export-actions"><button className="download-button split-button" onClick={() => openSplitter()} type="button" disabled={!visibleColumnIndexes.length}><Split size={16} /> Dividir base</button><button className="download-button course-button" onClick={openCourseEditor} type="button" disabled={!visibleColumnIndexes.length}><FileSpreadsheet size={16} /> Adicionar curso e baixar</button><button className="download-button" onClick={() => void downloadExcel()} type="button" disabled={!visibleColumnIndexes.length}><ArrowDownToLine size={17} /> Baixar Excel</button></div></section>
             <dialog ref={courseDialogRef} className="course-dialog" aria-labelledby="course-dialog-title" onClick={(event) => { if (event.target === event.currentTarget) courseDialogRef.current?.close(); }}>
               <form className="course-form" onSubmit={(event) => void downloadWithCourse(event)}>
                 <div className="course-dialog-heading"><div><h2 id="course-dialog-title">Adicionar curso à planilha</h2><p>A mensagem será adicionada em uma nova coluna ao final da planilha.</p></div><button className="course-close" type="button" aria-label="Fechar editor" onClick={() => courseDialogRef.current?.close()}><X size={17} /></button></div>
